@@ -1,4 +1,4 @@
-# docs-scraper
+# Siemens Docs MCP
 
 A CLI tool that converts Fluidtopics-based documentation portals into a structured tree of Markdown files — one file per page, folders mirroring the navigation hierarchy.
 
@@ -21,8 +21,16 @@ No browser automation is required.
 
 ## Installation
 
+### PyPI
+
 ```bash
-git clone https://github.com/your-org/docs-scraper.git
+pip install siemens-docs-mcp
+```
+
+### Build locally
+
+```bash
+git clone https://github.com/Czarnak/siemens-docs-mcp
 cd docs-scraper
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
