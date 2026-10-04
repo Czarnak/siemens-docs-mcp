@@ -23,6 +23,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -75,11 +76,11 @@ def run(config: dict, dry_run: bool = False, output_override: str | None = None,
     log.info("Map ID  : %s", map_id)
     log.info("Output  : %s", output_dir)
 
-    with FluidtopicsClient(api_base=api_base, map_id=map_id) as client:
+    with FluidtopicsClient(urlparse(api_base).hostname) as client:
 
         # ---- Step 1: fetch TOC ----
         log.info("Fetching TOC…")
-        pages_response = client.get_pages()
+        pages_response = client.get_pages(map_id)
         root: TocPage = parse_toc(pages_response)
         total = count_pages(root)
         log.info("TOC loaded — %d pages found", total)
@@ -112,7 +113,7 @@ def run(config: dict, dry_run: bool = False, output_override: str | None = None,
         for i, (page, out_path) in enumerate(targets, start=1):
             log.info("[%d/%d] %s", i, len(targets), page.title)
             try:
-                html = fetch_html(client, page)
+                html = fetch_html(client, map_id, page.content_id)
                 markdown = html_to_markdown(html, page.title)
                 write_page(out_path, markdown)
             except Exception as exc:  # noqa: BLE001

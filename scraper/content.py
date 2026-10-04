@@ -11,7 +11,6 @@ import logging
 from bs4 import BeautifulSoup, Tag
 
 from .client import FluidtopicsClient
-from .toc import TocPage
 
 log = logging.getLogger(__name__)
 
@@ -33,19 +32,20 @@ _CHROME_SELECTORS = [
 ]
 
 
-def fetch_html(client: FluidtopicsClient, page: TocPage) -> str:
+def fetch_html(client: FluidtopicsClient, map_id: str, content_id: str) -> str:
     """Fetch and pre-clean the HTML content for a page.
 
     Args:
         client: An active :class:`FluidtopicsClient`.
-        page:   The TOC page to fetch content for.
+        map_id: Fluidtopics map identifier.
+        content_id: The ``contentId`` of the topic to fetch.
 
     Returns:
         Cleaned HTML string, ready for Markdown conversion.
     """
-    raw = client.get_content(page.content_id)
+    raw = client.get_content(map_id, content_id)
     if not raw or not raw.strip():
-        log.warning("Empty content returned for '%s' (%s)", page.title, page.content_id)
+        log.warning("Empty content returned for %s", content_id)
         return ""
     return _clean_html(raw)
 

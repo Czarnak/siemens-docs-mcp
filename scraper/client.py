@@ -1,12 +1,17 @@
-"""HTTP client for the Fluidtopics REST API.
+"""HTTP client for the Fluidtopics REST API (one client per host).
 
 Fluidtopics requires a session cookie obtained from the authentication endpoint
 before any /api/khub/ calls will succeed. This client acquires that cookie
-automatically on first use and then reuses it for all subsequent requests.
+automatically, throttles every request to the host, and retries once on
+auth expiry, 429 and 5xx.
 """
 from __future__ import annotations
 
 import logging
+import math
+import threading
+import time
+from collections.abc import Callable
 from typing import Self
 
 import httpx
@@ -19,98 +24,147 @@ _DEFAULT_HEADERS = {
     "Accept": "application/json, text/html, */*",
 }
 
+_SESSION_PATH = "/internal/api/webapp/authentication/session"
+_DEFAULT_TIMEOUT = 30.0
+_MAPS_TIMEOUT = 120.0
+_BACKOFF_DEFAULT = 2.0
+_BACKOFF_MAX = 30.0
+
+
+class FluidtopicsError(Exception):
+    """Request to a Fluidtopics host failed; ``status`` is None for network errors."""
+
+    def __init__(self, status: int | None, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def _backoff_seconds(resp: httpx.Response) -> float:
+    """Seconds to wait before retrying: Retry-After (capped), else 2 s."""
+    try:
+        value = float(resp.headers.get("Retry-After", ""))
+    except ValueError:
+        return _BACKOFF_DEFAULT
+    if not math.isfinite(value) or value < 0:
+        return _BACKOFF_DEFAULT
+    return min(value, _BACKOFF_MAX)
+
 
 class FluidtopicsClient:
-    """Stateful HTTP client for one Fluidtopics documentation map.
+    """Stateful HTTP client for one Fluidtopics host.
 
     Usage::
 
-        with FluidtopicsClient(api_base="https://docs.example.com", map_id="abc") as client:
-            pages = client.get_pages()
-            html = client.get_content("topicId123")
+        with FluidtopicsClient("docs.tia.siemens.cloud") as client:
+            pages = client.get_pages("map-id")
+            html = client.get_content("map-id", "topicId123")
     """
 
-    def __init__(self, api_base: str, map_id: str, delay: float = 0.3) -> None:
-        """
-        Args:
-            api_base: Root URL of the Fluidtopics instance, e.g. "https://docs.tia.siemens.cloud".
-            map_id:   Fluidtopics map identifier — visible in the /api/khub/maps/{map_id}/ URLs.
-            delay:    Seconds to sleep between requests (polite crawling). Default 0.3 s.
-        """
-        self._api_base = api_base.rstrip("/")
-        self._map_id = map_id
-        self._delay = delay
+    def __init__(
+        self,
+        host: str,
+        min_interval: float = 0.3,
+        *,
+        transport: httpx.BaseTransport | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self._host = host
+        self._base = f"https://{host}"
+        self._min_interval = min_interval
+        self._clock = clock
+        self._sleep = sleep
+        self._lock = threading.Lock()
+        self._last = -math.inf
         self._http = httpx.Client(
             headers=_DEFAULT_HEADERS,
             follow_redirects=True,
-            timeout=30.0,
+            timeout=_DEFAULT_TIMEOUT,
+            transport=transport,
         )
         self._session_established = False
 
+    @property
+    def host(self) -> str:
+        return self._host
+
     # ------------------------------------------------------------------
-    # Session management
+    # Transport, session, retry
     # ------------------------------------------------------------------
 
+    def _send(self, method: str, path: str, **kw: object) -> httpx.Response:
+        """Throttled single request; transport failures become FluidtopicsError."""
+        with self._lock:
+            wait = self._last + self._min_interval - self._clock()
+            if wait > 0:
+                self._sleep(wait)
+            self._last = self._clock()
+        log.debug("%s %s%s", method, self._base, path)
+        try:
+            return self._http.request(method, f"{self._base}{path}", **kw)
+        except httpx.TransportError as exc:
+            raise FluidtopicsError(None, f"network error contacting {self._host}: {exc}") from exc
+
     def _ensure_session(self) -> None:
-        """Establish an anonymous session cookie if not already done."""
         if self._session_established:
             return
-        log.debug("Establishing Fluidtopics session…")
-        resp = self._http.get(f"{self._api_base}/internal/api/webapp/authentication/session")
-        resp.raise_for_status()
+        resp = self._send("GET", _SESSION_PATH)
+        if not resp.is_success:
+            raise FluidtopicsError(resp.status_code, f"GET {_SESSION_PATH} -> HTTP {resp.status_code}")
         self._session_established = True
-        log.debug("Session established (cookies: %s)", dict(self._http.cookies))
+
+    def _request(self, method: str, path: str, **kw: object) -> httpx.Response:
+        self._ensure_session()
+        resp = self._send(method, path, **kw)
+        if resp.status_code in (401, 403):
+            self._session_established = False
+            self._ensure_session()
+            resp = self._send(method, path, **kw)
+        elif resp.status_code == 429 or resp.status_code >= 500:
+            self._sleep(_backoff_seconds(resp))
+            resp = self._send(method, path, **kw)
+        if not resp.is_success:
+            raise FluidtopicsError(resp.status_code, f"{method} {path} -> HTTP {resp.status_code}")
+        return resp
 
     # ------------------------------------------------------------------
     # Public API methods
     # ------------------------------------------------------------------
 
-    def get_pages(self) -> dict:
-        """Return the complete TOC tree for the configured map.
+    def list_maps(self) -> list[dict]:
+        """Return all maps (publications) hosted on this server."""
+        return self._request("GET", "/api/khub/maps", timeout=_MAPS_TIMEOUT).json()
 
-        The response shape is::
+    def get_pages(self, map_id: str) -> dict:
+        """Return the complete TOC tree (``paginatedToc``) for a map."""
+        return self._request("GET", f"/api/khub/maps/{map_id}/pages").json()
 
-            {
-                "configuration": {"splitCurrentPageToc": bool},
-                "paginatedToc": [
-                    {
-                        "tocId": str,
-                        "contentId": str,
-                        "title": str,
-                        "prettyUrl": str,
-                        "pageToc": [... child nodes with "children" key ...]
-                    }
-                ]
-            }
-        """
-        self._ensure_session()
-        url = f"{self._api_base}/api/khub/maps/{self._map_id}/pages"
-        log.debug("GET %s", url)
-        resp = self._http.get(url)
-        resp.raise_for_status()
-        return resp.json()
-
-    def get_content(self, content_id: str) -> str:
-        """Return raw HTML content for a single topic.
-
-        Args:
-            content_id: The ``contentId`` value from a TOC node.
-
-        Returns:
-            Raw HTML string ready for Markdown conversion.
-        """
-        import time
-
-        self._ensure_session()
-        url = (
-            f"{self._api_base}/api/khub/maps/{self._map_id}"
-            f"/topics/{content_id}/content"
+    def get_content(self, map_id: str, content_id: str) -> str:
+        """Return raw HTML content for a single topic."""
+        resp = self._request(
+            "GET",
+            f"/api/khub/maps/{map_id}/topics/{content_id}/content",
+            params={"target": "DESIGNED_READER"},
         )
-        log.debug("GET %s", url)
-        resp = self._http.get(url, params={"target": "DESIGNED_READER"})
-        resp.raise_for_status()
-        time.sleep(self._delay)
         return resp.text
+
+    def search(
+        self,
+        query: str,
+        locale: str,
+        filters: list[dict] | None = None,
+        page: int = 1,
+        per_page: int = 10,
+    ) -> dict:
+        """Run a clustered search; ``filters`` are sent only when non-empty."""
+        body: dict = {
+            "query": query,
+            "contentLocale": locale,
+            "paging": {"page": page, "perPage": per_page},
+        }
+        if filters:
+            body["filters"] = filters
+        return self._request("POST", "/api/khub/clustered-search", json=body).json()
 
     # ------------------------------------------------------------------
     # Context manager
