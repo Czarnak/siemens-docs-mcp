@@ -1,8 +1,8 @@
 """Offline regression checks for HTML to Markdown conversion."""
 from pathlib import Path
 
-from scraper.content import _clean_html
-from scraper.converter import html_to_markdown
+from siemens_docs_mcp.content import _clean_html
+from siemens_docs_mcp.converter import html_to_markdown
 
 FIX = Path(__file__).parent / "fixtures" / "html"
 

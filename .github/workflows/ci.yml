@@ -36,4 +36,4 @@ jobs:
         run: pip-audit --skip-editable
 
       - name: Smoke test CLI help
-        run: python main.py --help
+        run: siemens-docs-export --help

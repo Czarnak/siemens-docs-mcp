@@ -1,4 +1,4 @@
-# docs-scraper configuration — Siemens TIA Portal Openness API v21
+# siemens-docs-export configuration — Siemens TIA Portal Openness API v21
 
 name: siemens_tia_openness_v21
 
@@ -6,5 +6,5 @@ name: siemens_tia_openness_v21
 url: "https://docs.tia.siemens.cloud/r/en-us/v21/tia-portal-openness-api-for-automation-of-engineering-workflows"
 
 # Directory where Markdown files will be written
-# Relative paths are resolved from the working directory where main.py is run
+# Relative paths are resolved from the working directory where siemens-docs-export is run
 output_dir: "output/siemens_tia_openness_v21"

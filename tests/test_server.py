@@ -1,7 +1,7 @@
 import pytest
 from mcp import Client
 
-from server import DEFAULT_HOSTS, Settings, build_server, load_settings
+from siemens_docs_mcp.server import DEFAULT_HOSTS, Settings, build_server, load_settings
 
 TOOLS = {"search_docs", "read_page", "get_toc", "list_publications"}
 

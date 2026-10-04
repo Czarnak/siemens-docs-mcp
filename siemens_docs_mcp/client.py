@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 _DEFAULT_HEADERS = {
     # Identify ourselves politely; some servers reject requests without UA.
-    "User-Agent": "docs-scraper/1.0",
+    "User-Agent": "siemens-docs-mcp/0.1",
     "Accept": "application/json, text/html, */*",
 }
 

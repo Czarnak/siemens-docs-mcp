@@ -5,10 +5,15 @@ import logging
 
 from bs4 import BeautifulSoup
 
-from scraper.catalog import SW_VERSION_KEY, TIA_VERSION_KEY, Catalog, CatalogError
-from scraper.content import fetch_html
-from scraper.converter import html_to_markdown
-from scraper.toc import TocPage, find_path
+from siemens_docs_mcp.catalog import (
+    SW_VERSION_KEY,
+    TIA_VERSION_KEY,
+    Catalog,
+    CatalogError,
+)
+from siemens_docs_mcp.content import fetch_html
+from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.toc import TocPage, find_path
 
 log = logging.getLogger(__name__)
 

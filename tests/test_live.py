@@ -1,10 +1,10 @@
 """Live smoke tests against the real hosts. Run with: pytest -m live"""
 import pytest
 
-from scraper import tools
-from scraper.catalog import Catalog
-from scraper.client import FluidtopicsClient
-from server import DEFAULT_HOSTS, DEFAULT_LOCALE, DEFAULT_MIN_INTERVAL
+from siemens_docs_mcp import tools
+from siemens_docs_mcp.catalog import Catalog
+from siemens_docs_mcp.client import FluidtopicsClient
+from siemens_docs_mcp.server import DEFAULT_HOSTS, DEFAULT_LOCALE, DEFAULT_MIN_INTERVAL
 
 QUERIES = {"docs.tia.siemens.cloud": "export block", "docs.industrial-operations-x.siemens.cloud": "OPC UA"}
 

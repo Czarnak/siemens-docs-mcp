@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from scraper import tools
-from scraper.catalog import Catalog, CatalogError
-from scraper.client import FluidtopicsClient, FluidtopicsError
+from siemens_docs_mcp import tools
+from siemens_docs_mcp.catalog import Catalog, CatalogError
+from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 
 log = logging.getLogger(__name__)
 

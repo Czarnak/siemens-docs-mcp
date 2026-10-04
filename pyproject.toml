@@ -8,6 +8,17 @@ version = "0.1.0"
 description = "Search and read Siemens Fluid Topics documentation via MCP or export it to Markdown"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Łukasz Czarnacki" }]
+keywords = ["mcp", "siemens", "tia-portal", "fluid-topics", "documentation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Topic :: Documentation",
+]
 dependencies = [
     "httpx>=0.28.1",
     "beautifulsoup4>=4.15.0",
@@ -17,15 +28,19 @@ dependencies = [
     "mcp>=2.3.0,<3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Czarnak/siemens-docs-mcp"
+Issues = "https://github.com/Czarnak/siemens-docs-mcp/issues"
+
 [project.scripts]
-siemens-docs-mcp = "server:main"
+siemens-docs-mcp = "siemens_docs_mcp.server:main"
+siemens-docs-export = "siemens_docs_mcp.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=9.1.1", "ruff>=0.16.10", "pip-audit>=2.10.1"]
+dev = ["pytest>=9.1.1", "pytest-cov>=7.1.0", "ruff>=0.16.10", "pip-audit>=2.10.1"]
 
 [tool.setuptools]
-packages = ["scraper"]
-py-modules = ["main", "server"]
+packages = ["siemens_docs_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

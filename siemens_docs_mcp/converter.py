@@ -32,7 +32,7 @@ def html_to_markdown(html: str, title: str) -> str:
     """Convert an HTML string to a Markdown document.
 
     Args:
-        html:  Cleaned HTML content (output of :func:`scraper.content.fetch_html`).
+        html:  Cleaned HTML content (output of :func:`siemens_docs_mcp.content.fetch_html`).
         title: Page title — prepended as an H1 heading.
 
     Returns:

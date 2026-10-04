@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from scraper.catalog import Catalog
+from siemens_docs_mcp.catalog import Catalog
 
 TIA_HOST = "docs.tia.siemens.cloud"
 IOX_HOST = "docs.industrial-operations-x.siemens.cloud"

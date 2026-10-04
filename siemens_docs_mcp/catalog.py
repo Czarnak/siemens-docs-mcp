@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import unquote, urlsplit
 
-from scraper.client import FluidtopicsClient
-from scraper.toc import TocPage, iter_pages, parse_toc
+from siemens_docs_mcp.client import FluidtopicsClient
+from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
 
 log = logging.getLogger(__name__)
 

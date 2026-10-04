@@ -1,4 +1,4 @@
-"""docs-scraper — CLI entry point.
+"""siemens-docs-export — CLI entry point.
 
 Config: ``url`` (any reader URL of the publication) or legacy ``api_base`` + ``map_id``,
 plus ``output_dir``.
@@ -6,19 +6,19 @@ plus ``output_dir``.
 Usage examples::
 
     # Scrape everything defined in a config
-    python main.py configs/siemens_tia_openness_v21.yaml
+    siemens-docs-export configs/siemens_tia_openness_v21.yaml
 
     # Preview what pages would be scraped (no files written)
-    python main.py configs/siemens_tia_openness_v21.yaml --dry-run
+    siemens-docs-export configs/siemens_tia_openness_v21.yaml --dry-run
 
     # Scrape with verbose logging
-    python main.py configs/siemens_tia_openness_v21.yaml --verbose
+    siemens-docs-export configs/siemens_tia_openness_v21.yaml --verbose
 
     # Override the output directory
-    python main.py configs/siemens_tia_openness_v21.yaml --output /tmp/docs
+    siemens-docs-export configs/siemens_tia_openness_v21.yaml --output /tmp/docs
 
     # Scrape only a specific page (useful for testing output quality)
-    python main.py configs/siemens_tia_openness_v21.yaml --page cybersecurity-information
+    siemens-docs-export configs/siemens_tia_openness_v21.yaml --page cybersecurity-information
 """
 from __future__ import annotations
 
@@ -31,12 +31,12 @@ from urllib.parse import urlparse
 
 import yaml
 
-from scraper.catalog import Catalog
-from scraper.client import FluidtopicsClient
-from scraper.content import fetch_html
-from scraper.converter import html_to_markdown
-from scraper.toc import TocPage, iter_pages, parse_toc
-from scraper.writer import resolve_output_paths, write_page
+from siemens_docs_mcp.catalog import Catalog
+from siemens_docs_mcp.client import FluidtopicsClient
+from siemens_docs_mcp.content import fetch_html
+from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
+from siemens_docs_mcp.writer import resolve_output_paths, write_page
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ def run(config: dict, dry_run: bool = False, output_override: str | None = None,
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="docs-scraper",
+        prog="siemens-docs-export",
         description="Scrape Fluidtopics documentation sites to a Markdown folder tree.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

@@ -2,8 +2,8 @@ from urllib.parse import quote
 
 import pytest
 
-from scraper.catalog import Catalog, CatalogError, MapInfo, Resolved
-from scraper.toc import find_path, parse_toc
+from siemens_docs_mcp.catalog import Catalog, CatalogError, MapInfo, Resolved
+from siemens_docs_mcp.toc import find_path, parse_toc
 from tests.conftest import (
     IOX_HOST,
     SHARED_PRETTY,

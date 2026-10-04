@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from scraper.client import FluidtopicsClient, FluidtopicsError
+from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 
 SESSION = "/internal/api/webapp/authentication/session"
 

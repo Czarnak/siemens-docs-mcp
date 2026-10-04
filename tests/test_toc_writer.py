@@ -1,8 +1,8 @@
 """Offline regression checks for TOC parsing and output paths."""
 from pathlib import Path
 
-from scraper.toc import iter_pages, parse_toc
-from scraper.writer import resolve_output_paths
+from siemens_docs_mcp.toc import iter_pages, parse_toc
+from siemens_docs_mcp.writer import resolve_output_paths
 
 BASE = "/r/en-us/v21/doc"
 

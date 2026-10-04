@@ -1,7 +1,7 @@
 import pytest
 
-from scraper.catalog import CatalogError, Resolved
-from scraper.tools import get_toc, list_publications, read_page, search_docs
+from siemens_docs_mcp.catalog import CatalogError, Resolved
+from siemens_docs_mcp.tools import get_toc, list_publications, read_page, search_docs
 from tests.conftest import (
     IOX_HOST,
     SHARED_PRETTY,
