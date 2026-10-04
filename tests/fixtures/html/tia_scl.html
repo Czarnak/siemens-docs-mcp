@@ -1,0 +1,99 @@
+<div class="content-locale-en-US content-locale-en"><meta name="Siemens.TIAHelp.HelpComponent" content="$COMPONENT=STEP 7"><meta name="Siemens.TIAHelp.Culture" content="en-US"><meta name="Siemens.TIAHelp.Package" content="ProgBlockSCLenUS"><meta name="Siemens.TIAHelp.Id" content="ProgBlockSCLenUS/11628733323/21687778187.htm"><meta name="Siemens.TIAHelp.TocParentId" content="ProgBlockSCLenUS/11628733323/20605547915.htm"><meta name="Siemens.TIAHelp.TocOrder" content="100"><meta name="Siemens.TIAHelp.TocTitle" content="Rules for SCL instructions"><meta name="Siemens.TIAHelp.IsDefault" content="False"><meta name="Siemens.TIAHelp.IsChapterPage" content="False"><meta name="Siemens.TIAHelp.DocumentationScope" content="SoftwareDocumentation"><meta name="Siemens.TIAHelp.ImageCategory" content="Factual Information"><meta name="Siemens.TIAHelp.HelpPackageTitle" content="Creating SCL programs"><meta name="Siemens.TIAHelp.HelpPackageTitleWithClient" content=": Creating SCL programs"><meta name="Siemens.TIAHelp.HelpConverterVersion" content="0.14.10"><meta name="Siemens.TIAHelp.HelpScope" content="$CLIENT='STEP7' and ($DEVICE='S7-300' or $DEVICE='S7-400' or $DEVICE='S7-1200' or $DEVICE='S7-1500' or $DEVICE='S7-1500T' or $DEVICE='PC')"><div id="nsbanner">
+      <div id="titlerowdefault">
+        <table class="title">
+          <tbody><tr>
+            <td class="title">Rules for SCL instructions</td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div><div id="nstext">
+      <a id="block_1"></a>
+      <p class="BlocktitleFirst">Instructions in SCL     </p>
+      <p>SCL recognizes the following types of instructions: </p>
+      <ul>
+        <li>
+          <p>Value assignments</p>
+          <p>Value assignments are used to assign a tag a constant value, the result of an expression or the value of another tag. </p>
+        </li>
+        <li>
+          <p>Instructions for program control</p>
+          <p>Instructions for program control are used to implement program branches, loops or jumps.</p>
+        </li>
+        <li>
+          <p>Additional instructions from the "Instructions" task card</p>
+          <p>The "Instructions" task card offers a wide selection of standard instructions that you can use in your SCL program.</p>
+        </li>
+        <li>
+          <p>Block calls</p>
+          <p>Block calls are used to call up subroutines that have been placed in other blocks and to further process their results.</p>
+        </li>
+      </ul>
+      <a id="block_2"></a>
+      <p class="Blocktitle">Rules</p>
+      <p>You need to observe the following rules when entering SCL instructions:</p>
+      <ul>
+        <li>
+          <p>Instructions can span several lines.</p>
+        </li>
+        <li>
+          <p>Each instruction ends with a semicolon (;).</p>
+        </li>
+        <li>
+          <p>No distinction is made between upper and lower case.</p>
+        </li>
+        <li>
+          <p>Comments serve only for documentation of the program. They do not affect the program execution.</p>
+        </li>
+      </ul>
+      <a id="block_3"></a>
+      <p class="Blocktitle">Examples</p>
+      <p>The following examples shows the various types of instructions:</p>
+      <p space-before="0pt">
+        </p><p class="p_table_title" space-after="0pt"></p>
+        <div>
+          <table id="3e44eef4-7c51-4473-ba01-7d78241071c5" class="table_sourcecode" width="100%" cellspacing="0" cellpadding="0">
+            <colgroup>
+              <col width="100%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>
+                  <p class="table_sourcecode">SCL <a href="https://docs.tia.siemens.cloud/r/MKsgSZvSoJDfAK_G3NxYhQ/wqgujtgMEDqqxoEyJXYO7A?section=" title="Copies the following program code to clipboard." class="ft-internal-link" data-ft-click-interceptor="ft-internal-link"><img src="https://docs.tia.siemens.cloud/portal-asset/iconCopy" alt="Copies the following program code to clipboard."></a></p>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <p class="p_table_l_code">// Example of a value assignment </p>
+                  <p class="p_table_l_code">"MyTag":= 0;</p>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <p class="p_table_l_code">// Example of a block call</p>
+                  <p class="p_table_l_code">"MyDB"();</p>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <p class="p_table_l_code">// Example of a program control instruction </p>
+                  <p class="p_table_l_code">WHILE "Counter" &lt; 10 DO </p>
+                  <p class="p_table_l_code">    "MyTAG" := "MyTag" + 2;</p>
+                  <p class="p_table_l_code">END_WHILE;</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      
+      <div id="nsseealso">
+        <p>
+          <b>See also</b>
+        </p>
+        <p>
+          <a href="https://docs.tia.siemens.cloud/r/MKsgSZvSoJDfAK_G3NxYhQ/W2NZ89cHm0pp51Veyuo42Q" class="ft-internal-link" data-ft-click-interceptor="ft-internal-link">Basics of SCL</a>
+          <br>
+        </p>
+      </div>
+    </div><br><hr></div>

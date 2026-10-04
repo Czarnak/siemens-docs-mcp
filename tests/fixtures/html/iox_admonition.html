@@ -1,0 +1,20 @@
+<div class="ft_node_extractor content-locale-en-US content-locale-en">
+<p>The presentation of your ST program data on the PLC's OPC UA Server is controlled by annotating your ST program with the appropriate pragmas. The OPC UA plugin for the ST Compiler (@ax/st-opcua.stc-plugin) validates the <a href="https://docs.industrial-operations-x.siemens.cloud/r/F2~cndjrEaWHpXLkY33djA/wbkXLoGiqUvjbTT_xPM91w" class="ft-internal-link" data-ft-click-interceptor="ft-internal-link">OPC UA configuration pragmas</a> and generates a corresponding NodeSet XML document during a successful compilation.</p>
+<p>Options that affect the server configuration as a whole are configured with pragma annotations above the <a href="https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fst-docs&amp;ft:topicTitle=Configuration+declaration" data-ft-click-interceptor="ft-internal-link">configuration declaration</a>.</p>
+<p>Options that affect individual variable-mapping nodes are configured with pragma annotations above an individual variable or section of variables:</p>
+<div class="highlight"><pre><span></span><code>{OpcUa.NodeGenerator.IdType = SymbolName} // Use fully-qualified variable names as OPC UA NodeIds
+CONFIGURATION PLC_1
+  VAR_GLOBAL
+    {S7.extern = ReadWrite} // Make var1 Read/Write accessible to the Web API and OPC UA Node Generator
+    {OpcUa.AccessLevel = WriteOnly}  // Create an OPC UA node mapped to var1 with AccessLevel WriteOnly
+    var1:INT;
+  END_VAR
+END_CONFIGURATION
+</code></pre></div>
+<p>To install the OPC UA server configuration, the user must <a href="https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fapax&amp;ft:topicTitle=Apax+command-line+reference" data-ft-click-interceptor="ft-internal-link">build</a> an annotated ST program and <a href="https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fsld&amp;ft:topicTitle=load" data-ft-click-interceptor="ft-internal-link">load</a> the program onto their PLC.</p>
+<p>The configuration installed using ST Code Annotation will be named <code>Server Interface_1</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>After building your AX project, the generated NodeSet XML file can be found in the project output directory under <code>opcua/generated.xml</code>.</p>
+</div>
+</div>

@@ -6,7 +6,7 @@ Siemens/Fluidtopics-specific HTML patterns:
 - Siemens CSS classes (BlocktitleFirst, Blocktitle, p_table_l_code,
   table_sourcecode, safety) are mapped to appropriate Markdown constructs.
 - Safety/note/warning tables become Markdown blockquotes.
-- Source-code tables and paragraphs become fenced code blocks (csharp).
+- Source-code tables and paragraphs become fenced code blocks (no language tag).
 - Standard GFM tables are produced for regular data tables.
 - Nested lists are handled correctly.
 - HTML headings (h1–h6) are converted to ATX headings.
@@ -22,6 +22,7 @@ import re
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
+from markdownify import markdownify
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -144,7 +145,7 @@ def _render_block(tag: Tag) -> str:
             return f"## {_clean_text(text)}"
         # Siemens inline code paragraph classes → fenced code block
         if "p_table_l_code" in cls or "table_sourcecode" in cls:
-            return f"```csharp\n{text}\n```"
+            return f"```\n{text}\n```"
         # Table-title paragraphs carry no useful prose — skip
         if "p_table_title" in cls:
             return ""
@@ -163,14 +164,21 @@ def _render_block(tag: Tag) -> str:
             code_lines = [p.get_text() for p in tag.find_all("p", class_="p_table_l_code")]
             raw = "\n".join(code_lines) if code_lines else tag.get_text("\n", strip=False)
             code = _normalize_code(raw)
-            return f"```csharp\n{code}\n```" if code else ""
+            return f"```\n{code}\n```" if code else ""
         if "safety" in classes:
             return _render_safety_table(tag)
         return _render_regular_table(tag)
 
     # --- Divs ---
     if name == "div":
+        if "admonition" in tag.get("class", []):
+            return _render_admonition(tag)
         return _render_div(tag)
+
+    # --- Preformatted code ---
+    if name == "pre":
+        code = _normalize_code(tag.get_text())
+        return f"```\n{code}\n```" if code else ""
 
     # --- Standalone images ---
     if name == "img":
@@ -191,7 +199,12 @@ def _render_block(tag: Tag) -> str:
             rendered = _render_block(child)
             if rendered:
                 pieces.append(rendered)
-    return "\n\n".join(pieces)
+    if pieces:
+        return "\n\n".join(pieces)
+    # Inline-only unknown tag (dl, details, ...): keep its text via markdownify.
+    if tag.get_text(strip=True):
+        return markdownify(str(tag), heading_style="ATX").strip()
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +317,29 @@ def _render_regular_table(table: Tag) -> str:
 # ---------------------------------------------------------------------------
 # Div rendering
 # ---------------------------------------------------------------------------
+
+def _render_admonition(div: Tag) -> str:
+    """Render a MkDocs-style admonition div as a labelled Markdown blockquote."""
+    title = div.find(class_="admonition-title")
+    if title is not None:
+        label = _clean_text(title.get_text())
+    else:
+        others = [c for c in div.get("class", []) if c != "admonition"]
+        label = others[0].capitalize() if others else "Note"
+
+    body = [
+        r
+        for child in div.children
+        if isinstance(child, Tag) and child is not title
+        if (r := _render_block(child))
+    ]
+    if not body:
+        return f"> **{label}:**"
+    lines = "\n\n".join(body).split("\n")
+    out = [f"> **{label}:** {lines[0]}"]
+    out.extend(f"> {ln}".rstrip() for ln in lines[1:])
+    return "\n".join(out)
+
 
 def _render_div(div: Tag) -> str:
     """Render a <div> by visiting its block-level children."""
