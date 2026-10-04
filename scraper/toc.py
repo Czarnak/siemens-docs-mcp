@@ -68,6 +68,17 @@ def iter_pages(root: TocPage) -> Iterator[TocPage]:
         yield from iter_pages(child)
 
 
+def find_path(root: TocPage, content_id: str) -> list[TocPage] | None:
+    """Return the root-to-node path for ``content_id`` (DFS), or None if absent."""
+    if root.content_id == content_id:
+        return [root]
+    for child in root.children:
+        sub = find_path(child, content_id)
+        if sub is not None:
+            return [root, *sub]
+    return None
+
+
 def count_pages(root: TocPage) -> int:
     """Count the total number of pages in the tree."""
     return sum(1 for _ in iter_pages(root))

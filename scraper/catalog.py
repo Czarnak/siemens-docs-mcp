@@ -1,0 +1,210 @@
+"""Per-host catalog of publications (maps): listing, canonicalization, URL resolution, TOC cache."""
+from __future__ import annotations
+
+import difflib
+import logging
+import time
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Literal
+from urllib.parse import urlsplit
+
+from scraper.client import FluidtopicsClient
+from scraper.toc import TocPage, iter_pages, parse_toc
+
+log = logging.getLogger(__name__)
+
+TIA_VERSION_KEY = "tia:SoftwareVersionFilter"
+SW_VERSION_KEY = "SoftwareVersion"
+_VERSION_KEYS = (TIA_VERSION_KEY, SW_VERSION_KEY)
+
+
+class CatalogError(ValueError):
+    """Raised for unknown hosts, unresolvable URLs, and unknown filter values."""
+
+
+@dataclass(frozen=True)
+class MapInfo:
+    id: str
+    title: str
+    locale: str
+    product: str
+    version: str
+    version_key: str
+    pretty_url: str
+    cluster_id: str
+    last_publication: str
+
+
+@dataclass(frozen=True)
+class Resolved:
+    host: str
+    map_id: str
+    content_id: str | None
+
+
+def _meta(raw: dict) -> dict[str, list[str]]:
+    return {m["key"]: m.get("values") or [] for m in raw.get("metadata", [])}
+
+
+def _first(meta: dict[str, list[str]], key: str) -> str:
+    values = meta.get(key) or []
+    return values[0] if values else ""
+
+
+def _map_info(raw: dict) -> MapInfo:
+    meta = _meta(raw)
+    version_key = next((k for k in _VERSION_KEYS if _first(meta, k)), "")
+    return MapInfo(
+        id=raw["id"],
+        title=raw.get("title", ""),
+        locale=_first(meta, "ft:locale"),
+        product=_first(meta, "Product"),
+        version=_first(meta, version_key) if version_key else "",
+        version_key=version_key,
+        pretty_url=_first(meta, "ft:prettyUrl").removeprefix("/r/"),
+        cluster_id=_first(meta, "ft:clusterId"),
+        last_publication=_first(meta, "ft:lastPublication"),
+    )
+
+
+class Catalog:
+    def __init__(
+        self,
+        hosts: Sequence[str],
+        client_factory: Callable[[str], FluidtopicsClient],
+        ttl_seconds: float = 86400,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.hosts: tuple[str, ...] = tuple(h.lower() for h in hosts)
+        self._factory = client_factory
+        self._ttl = ttl_seconds
+        self._clock = clock
+        self._clients: dict[str, FluidtopicsClient] = {}
+        self._maps: dict[str, tuple[float, dict[str, MapInfo]]] = {}
+        # Raw distinct version values per host per key (a map can carry both keys).
+        self._versions: dict[str, dict[str, list[str]]] = {}
+        self._tocs: dict[tuple[str, str], tuple[float, TocPage]] = {}
+
+    def _check_host(self, host: str) -> str:
+        host = host.lower()
+        if host not in self.hosts:
+            raise CatalogError(f"Host {host!r} is not allowed. Allowed hosts: {list(self.hosts)}")
+        return host
+
+    def client(self, host: str) -> FluidtopicsClient:
+        host = self._check_host(host)
+        if host not in self._clients:
+            self._clients[host] = self._factory(host)
+        return self._clients[host]
+
+    def _fresh(self, stamp: float) -> bool:
+        return self._clock() - stamp <= self._ttl
+
+    def maps(self, host: str) -> dict[str, MapInfo]:
+        host = self._check_host(host)
+        cached = self._maps.get(host)
+        if cached and self._fresh(cached[0]):
+            return cached[1]
+        raws = self.client(host).list_maps()
+        infos = {m.id: m for m in map(_map_info, raws)}
+        versions: dict[str, list[str]] = {k: [] for k in _VERSION_KEYS}
+        for raw in raws:
+            meta = _meta(raw)
+            for key in _VERSION_KEYS:
+                v = _first(meta, key)
+                if v and v not in versions[key]:
+                    versions[key].append(v)
+        self._versions[host] = versions
+        self._maps[host] = (self._clock(), infos)
+        return infos
+
+    @staticmethod
+    def _unknown(host: str, label: str, value: str, known: list[str]) -> CatalogError:
+        close = difflib.get_close_matches(value, known, n=5, cutoff=0.5)
+        return CatalogError(f"Unknown {label} {value!r} on {host}. Close matches: {close or known[:10]}")
+
+    def canonical(self, host: str, field: Literal["product", "locale"], value: str) -> str:
+        values = sorted({getattr(m, field) for m in self.maps(host).values()} - {""})
+        for v in values:
+            if v.lower() == value.lower():
+                return v
+        raise self._unknown(host, field, value, values)
+
+    def canonical_version(self, host: str, value: str) -> tuple[str, str]:
+        self.maps(host)
+        versions = self._versions[host.lower()]
+        for key in _VERSION_KEYS:
+            for v in versions[key]:
+                if v.lower() == value.lower():
+                    return key, v
+        known = sorted({v for vs in versions.values() for v in vs})
+        raise self._unknown(host, "version", value, known)
+
+    def filter(
+        self,
+        host: str,
+        product: str | None = None,
+        version: str | None = None,
+        locale: str | None = None,
+        title_contains: str | None = None,
+    ) -> list[MapInfo]:
+        result = list(self.maps(host).values())
+        if product is not None:
+            p = self.canonical(host, "product", product)
+            result = [m for m in result if m.product == p]
+        if locale is not None:
+            loc = self.canonical(host, "locale", locale)
+            result = [m for m in result if m.locale == loc]
+        if version is not None:
+            key, v = self.canonical_version(host, version)
+            result = [m for m in result if m.version == v and m.version_key == key]
+        if title_contains:
+            needle = title_contains.lower()
+            result = [m for m in result if needle in m.title.lower()]
+        return sorted(result, key=lambda m: m.title)
+
+    def toc(self, host: str, map_id: str) -> TocPage:
+        key = (self._check_host(host), map_id)
+        cached = self._tocs.get(key)
+        if cached and self._fresh(cached[0]):
+            return cached[1]
+        root = parse_toc(self.client(host).get_pages(map_id))
+        self._tocs[key] = (self._clock(), root)
+        return root
+
+    def resolve(self, url: str) -> Resolved:
+        failure = CatalogError(
+            f"Could not resolve {url}. Use search_docs or list_publications to find a valid reader URL."
+        )
+        parts = urlsplit(url.strip())
+        host = self._check_host(parts.hostname or "")
+        path = parts.path.rstrip("/")
+        if not path.startswith("/r/"):
+            raise failure
+        rel = path[3:]
+        segs = rel.split("/")
+        maps = self.maps(host)
+        if segs[0] in maps:
+            return Resolved(host, segs[0], segs[1] if len(segs) > 1 else None)
+        low = rel.lower()
+        matches = [
+            m for m in maps.values()
+            if m.pretty_url
+            and (low == m.pretty_url.lower() or (low + "/").startswith(m.pretty_url.lower() + "/"))
+        ]
+        if not matches:
+            raise failure
+        best = max(matches, key=lambda m: len(m.pretty_url))
+        if low == best.pretty_url.lower():
+            return Resolved(host, best.id, None)
+        target = "/r/" + low
+        for page in iter_pages(self.toc(host, best.id)):
+            if page.pretty_url.lower() == target:
+                return Resolved(host, best.id, page.content_id)
+        raise failure
+
+    def reader_url(self, host: str, map_id: str, page: TocPage) -> str:
+        if page.pretty_url:
+            return f"https://{host}{page.pretty_url}"
+        return f"https://{host}/r/{map_id}/{page.content_id}"
