@@ -6,7 +6,7 @@
 
 **Architecture:** A per-host HTTP client (throttle, session, retry) feeds an in-memory `Catalog` (map list, URL resolution, filter canonicalization, TOC cache). Pure tool functions in `scraper/tools.py` turn catalog + client output into Markdown strings; `server.py` registers them with the MCP SDK and maps errors to `ToolError`. `main.py` (CLI) uses the same client and catalog.
 
-**Tech Stack:** Python 3.12, httpx, BeautifulSoup4, markdownify, PyYAML, MCP Python SDK v2 (`mcp>=2,<3`, `from mcp.server import MCPServer`), pytest + anyio plugin, ruff, pip-audit; packaging via `pyproject.toml` (setuptools).
+**Tech Stack:** Python 3.12, httpx, BeautifulSoup4, markdownify, PyYAML, MCP Python SDK v2 (`mcp>=2.3.0,<3`, `from mcp.server import MCPServer`), pytest + anyio plugin, ruff, pip-audit; packaging via `pyproject.toml` (setuptools).
 
 **Spec:** `docs/superpowers/specs/2026-10-04-universal-fluid-docs-mcp-design.md`
 
@@ -22,7 +22,8 @@
 - Search filters: product → key `Product`; version → key `tia:SoftwareVersionFilter` or `SoftwareVersion` (whichever the canonical value came from). Values are matched exactly server-side, so always canonicalize first.
 - Code fences from the converter carry no language tag.
 - Tool failures surface as `mcp.server.mcpserver.exceptions.ToolError` with a human-readable message; no stack traces to the agent.
-- Dependencies live only in `pyproject.toml` (no `requirements*.txt`). No new runtime dependency other than `mcp`; dev extra `dev` = `pytest>=9`, `ruff`, `pip-audit>=2.10`. Install: `python -m pip install -e ".[dev]"`.
+- Dependencies live only in `pyproject.toml` (no `requirements*.txt`). No new runtime dependency other than `mcp`. Dev tools in PEP 735 `[dependency-groups] dev` = `pytest`, `ruff`, `pip-audit`. Install: `python -m pip install -e . --group dev` (requires pip ≥ 25.1; venv has 26.2.1).
+- **Newest versions policy:** every dependency floor is the latest release at the time it is added (checked with `python -m pip index versions <pkg>`). As of 2026-10-04: httpx 0.28.1, beautifulsoup4 4.15.0, markdownify 1.2.3, PyYAML 6.0.3, lxml 6.1.3, mcp 2.3.0, pytest 9.1.1, ruff 0.16.10, pip-audit 2.10.1, setuptools 84.0.0. Upper bounds only for known major-version breaks (`mcp<3`).
 - Any task that changes dependencies runs `python -m pip_audit --skip-editable` and must end with no known vulnerabilities.
 - Use the project venv: `.venv/Scripts/python.exe` (Windows). Commands below write `python` for brevity.
 
@@ -49,7 +50,7 @@
 | `server.py` (new) | `Settings`, `load_settings`, `build_server`, `main`. |
 | `main.py` (modify) | `url:` config, shared client/catalog. |
 | `tests/` (new) | `conftest.py`, `test_toc_writer.py`, `test_converter.py`, `test_client.py`, `test_catalog.py`, `test_tools.py`, `test_server.py`, `test_cli.py`, `test_live.py`, `fixtures/html/*.html`. |
-| `pyproject.toml` (new — dependencies, dev extra, pytest config, console script); `.github/workflows/ci.yml`, `README.md`, `configs/siemens_tia_openness_v21.yaml` (modify). |
+| `pyproject.toml` (new — dependencies, `dev` dependency group, pytest config, console script); `.github/workflows/ci.yml`, `README.md`, `configs/siemens_tia_openness_v21.yaml` (modify). |
 | `requirements.txt` (delete — replaced by `pyproject.toml`). |
 | `test_scraper.py` (delete — moved to `tests/`). |
 
@@ -63,13 +64,13 @@
 - Delete: `requirements.txt`, `test_scraper.py`
 
 **Interfaces:**
-- Produces: dependencies declared only in `pyproject.toml`; `python -m pip install -e ".[dev]"` installs runtime + dev tools; `pytest` runs from repo root with marker `live` deselected by default; `pip-audit` available.
+- Produces: dependencies declared only in `pyproject.toml`; `python -m pip install -e . --group dev` installs runtime + dev tools; `pytest` runs from repo root with marker `live` deselected by default; `pip-audit` available.
 
-- [ ] **Step 1: Write `pyproject.toml`** (replaces `requirements.txt`; same runtime floors)
+- [ ] **Step 1: Write `pyproject.toml`** (replaces `requirements.txt`; floors raised to latest releases per Global Constraints)
 
 ```toml
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -79,15 +80,15 @@ description = "Search and read Siemens Fluid Topics documentation via MCP or exp
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "httpx>=0.27.0",
-    "beautifulsoup4>=4.12.0",
-    "markdownify>=0.13.1",
-    "PyYAML>=6.0.1",
-    "lxml>=5.2.0",
+    "httpx>=0.28.1",
+    "beautifulsoup4>=4.15.0",
+    "markdownify>=1.2.3",
+    "PyYAML>=6.0.3",
+    "lxml>=6.1.3",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest>=9", "ruff", "pip-audit>=2.10"]
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.10", "pip-audit>=2.10.1"]
 
 [tool.setuptools]
 packages = ["scraper"]
@@ -98,7 +99,7 @@ testpaths = ["tests"]
 addopts = '-m "not live"'
 markers = ["live: hits real Fluid Topics hosts (run with: pytest -m live)"]
 ```
-Dev tools use `optional-dependencies` rather than PEP 735 `[dependency-groups]` because the project venv has pip 25.0.1, which cannot install groups (needs ≥ 25.1). `git rm requirements.txt`.
+Before writing, re-check each floor with `python -m pip index versions <pkg>` and use the newest release if it moved. `git rm requirements.txt`.
 
 - [ ] **Step 2: Move tests**
 
@@ -106,12 +107,12 @@ Move `test_output_paths` into `tests/test_toc_writer.py` and `test_code_table_is
 
 - [ ] **Step 3: Run**
 
-Run: `python -m pip install -e ".[dev]" && python -m pytest -q && python -m pip_audit --skip-editable`
-Expected: `2 passed`; pip-audit prints `No known vulnerabilities found`. If it reports vulnerabilities, raise the affected floor in `pyproject.toml` and re-run; do not ignore.
+Run: `python -m pip install -e . --group dev && python -m pytest -q && python -m pip_audit --skip-editable`
+Expected: `2 passed` (the existing converter/path tests must survive the markdownify 1.x / lxml 6 floors; fix code, not tests, if they don't); pip-audit prints `No known vulnerabilities found`. If it reports vulnerabilities, raise the affected floor and re-run; do not ignore.
 
 - [ ] **Step 4: CI and README**
 
-In `.github/workflows/ci.yml`: install with `pip install -e ".[dev]"`; replace the "Verify imports resolve" step with `python -m pytest -q`; add a step `pip-audit --skip-editable`; keep ruff and `python main.py --help`. In `README.md` Installation, replace `pip install -r requirements.txt` with `pip install -e .` (and `pip install -e ".[dev]"` for development).
+In `.github/workflows/ci.yml`: add `python -m pip install --upgrade pip` before installing (runner pip may predate 25.1 group support); install with `pip install -e . --group dev`; replace the "Verify imports resolve" step with `python -m pytest -q`; add a step `pip-audit --skip-editable`; keep ruff and `python main.py --help`. In `README.md` Installation, replace `pip install -r requirements.txt` with `pip install -e .` (and `pip install -e . --group dev` for development, noting pip ≥ 25.1).
 
 - [ ] **Step 5: Commit**
 
@@ -416,7 +417,7 @@ git commit -m "feat: read_page and get_toc tool logic"
 
 **Files:**
 - Create: `server.py`, `tests/test_server.py`
-- Modify: `pyproject.toml` — add `"mcp>=2,<3"` to `dependencies`; `py-modules = ["main", "server"]`; add
+- Modify: `pyproject.toml` — add `"mcp>=2.3.0,<3"` to `dependencies` (re-check the latest 2.x first); `py-modules = ["main", "server"]`; add
   ```toml
   [project.scripts]
   siemens-docs-mcp = "server:main"
@@ -445,7 +446,7 @@ async def test_search_defaults_host_and_locale(server, fake_tia): ...  # call se
 ```
 `server` fixture = `build_server(catalog_from_conftest, Settings(DEFAULT_HOSTS, "en-US", 0.0))`.
 
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** (update `pyproject.toml`, then `python -m pip install -e ".[dev]"`). **Step 4: Run** `python -m pytest -q` → pass.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** (update `pyproject.toml`, then `python -m pip install -e . --group dev`). **Step 4: Run** `python -m pytest -q` → pass.
 
 - [ ] **Step 5: Dependency audit and smoke check**
 

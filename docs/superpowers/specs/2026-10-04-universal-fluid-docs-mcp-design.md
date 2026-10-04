@@ -128,7 +128,7 @@ Hosts are bare hostnames; the server always uses `https://`.
 ## 4. MCP tools (`server.py`)
 
 Built on the official MCP Python SDK v2 (`from mcp.server import MCPServer`, `@mcp.tool()`,
-`mcp.run()` stdio). Pin `mcp>=2,<3`. Failures raise `ToolError` so the message reaches the agent
+`mcp.run()` stdio). Pin `mcp>=2.3.0,<3` (latest at time of writing). Failures raise `ToolError` so the message reaches the agent
 as an `is_error` result. All tools return Markdown text.
 
 | Tool | Parameters | Returns |
@@ -191,7 +191,7 @@ Reader URL for a TOC node: `https://{host}{prettyUrl}` when present, else
 ## 9. Testing
 
 - Dependencies move from `requirements.txt` to `pyproject.toml` (amended 2026-10-04); dev
-  tools in the `dev` optional-dependency extra: `pytest`, `ruff`, `pip-audit`. CI runs
+  tools in the PEP 735 `dev` dependency group: `pytest`, `ruff`, `pip-audit`; floors track the newest releases. CI runs
   `pip-audit --skip-editable` alongside the tests.
 - Move `test_scraper.py` checks into `tests/` and run with `pytest`.
 - **Offline unit tests** with trimmed real fixtures in `tests/fixtures/`: catalog slice
