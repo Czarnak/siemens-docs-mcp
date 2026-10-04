@@ -92,7 +92,13 @@ main.py   (CLI export) ─┘   scraper/toc.py, content.py, converter.py, writer
   `MapInfo` = `id, title, locale, product, version, pretty_url, cluster_id, last_publication`
   (product from `Product` — the key search filters on; version from
   `tia:SoftwareVersionFilter`, falling back to `SoftwareVersion` for maps without it, e.g. IOX).
-- Loaded lazily per host on first use, refreshed when older than TTL. In-memory only.
+- Loaded lazily per host on first use, refreshed when older than TTL. **In-memory only:** the
+  cache lives exactly as long as the server process — nothing is persisted, so nothing needs
+  clearing on exit, and every start (MCP clients typically spawn one server per session) begins
+  cold. Measured cold cost: ~3.2 s (TIA, 4,073 maps) / ~2.0 s (IOX, 2,268 maps) on the first
+  catalog-dependent call per host. The API sends no `ETag`/`Last-Modified`, so freshness is
+  age-based only. Disk persistence was considered and declined (2026-10-04); revisit if
+  cold-start latency becomes a complaint.
 - `resolve(url) -> (host, map_id, content_id | None)`:
   1. Parse URL; host must be in the allowlist, else error.
   2. `/r/{mapId}/{contentId}` or `/r/{mapId}` where `mapId` is a known map id → direct.
