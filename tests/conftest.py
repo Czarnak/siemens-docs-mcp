@@ -168,3 +168,35 @@ def catalog_with_clock(fake_tia: FakeClient, fake_iox: FakeClient) -> Catalog:
     cat = Catalog([TIA_HOST, IOX_HOST], lambda host: clients[host], clock=lambda: cat.clock_value)
     cat.clock_value = 1000.0  # mutable fake clock; tests advance it
     return cat
+
+
+def make_hit(
+    title: str = "Hit",
+    map_title: str = "STEP 7 Basic",
+    breadcrumb: list[str] | None = None,
+    excerpt: str = "<p>Some <b>text</b></p>",
+    reader_url: str = "https://docs.tia.siemens.cloud/r/en-us/v21/doc/page",
+    metadata: list[dict] | None = None,
+) -> dict:
+    """One search cluster whose first entry is a TOPIC."""
+    return {
+        "entries": [
+            {
+                "type": "TOPIC",
+                "topic": {
+                    "mapId": "tia2",
+                    "contentId": "c1",
+                    "title": title,
+                    "mapTitle": map_title,
+                    "breadcrumb": breadcrumb if breadcrumb is not None else ["Chapter 1", "Section"],
+                    "htmlExcerpt": excerpt,
+                    "readerUrl": reader_url,
+                    "metadata": metadata if metadata is not None else [],
+                },
+            }
+        ]
+    }
+
+
+def make_search_response(clusters: list[dict], total: int | None = None) -> dict:
+    return {"totalResultsCount": len(clusters) if total is None else total, "results": clusters}
