@@ -1,21 +1,8 @@
 # Siemens Docs MCP
 
-A CLI tool that converts Fluidtopics-based documentation portals into a structured tree of Markdown files — one file per page, folders mirroring the navigation hierarchy.
+An MCP server that lets an AI assistant search and read Siemens documentation live — any publication on `docs.tia.siemens.cloud` (TIA Portal, STEP 7, WinCC Unified, Openness, …) and `docs.industrial-operations-x.siemens.cloud` (Industrial Operations X) — plus a CLI that exports a whole publication to a tree of Markdown files.
 
-Built to solve the problem of documentation portals (e.g. Siemens TIA Portal) that only offer low-quality PDF exports or JavaScript-rendered web views, making the content difficult to search, reference, or feed to AI tools.
-
----
-
-## How it works
-
-Fluidtopics (the platform behind `docs.tia.siemens.cloud` and similar portals) exposes a REST API that the browser SPA uses internally. This tool calls that API directly:
-
-1. **Fetch TOC** — `GET /api/khub/maps/{mapId}/pages` returns the full navigation tree with titles and URLs.
-2. **Fetch content** — `GET /api/khub/maps/{mapId}/topics/{contentId}/content` returns raw HTML per page.
-3. **Convert** — HTML is converted to Markdown using [markdownify](https://github.com/matthewwithanm/python-markdownify).
-4. **Write** — Files are written to disk following the URL hierarchy.
-
-No browser automation is required.
+Built to solve the problem of documentation portals that only offer low-quality PDF exports or JavaScript-rendered web views, making the content difficult to search, reference, or feed to AI tools.
 
 ---
 
@@ -27,11 +14,13 @@ No browser automation is required.
 pip install siemens-docs-mcp
 ```
 
-### Build locally
+This installs two commands: `siemens-docs-mcp` (the MCP server) and `siemens-docs-export` (the Markdown exporter). Requires Python 3.11+.
+
+### From source
 
 ```bash
 git clone https://github.com/Czarnak/siemens-docs-mcp
-cd docs-scraper
+cd siemens-docs-mcp
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
@@ -39,39 +28,77 @@ pip install -e .
 pip install -e . --group dev
 ```
 
-Requires Python 3.11+.
-
 ---
 
-## Usage
+## MCP server
+
+The server speaks MCP over stdio. Register it with Claude Code:
 
 ```bash
-# Scrape everything
-python main.py configs/siemens_tia_openness_v21.yaml
+# from PyPI, no manual install (needs uv)
+claude mcp add siemens-docs -- uvx siemens-docs-mcp
 
-# Preview pages without writing files
-python main.py configs/siemens_tia_openness_v21.yaml --dry-run
-
-# Scrape a single page (for testing output quality)
-python main.py configs/siemens_tia_openness_v21.yaml --page cybersecurity-information
-
-# Override the output directory
-python main.py configs/siemens_tia_openness_v21.yaml --output /tmp/docs
-
-# Verbose logging
-python main.py configs/siemens_tia_openness_v21.yaml --verbose
+# or an installed copy
+claude mcp add siemens-docs -- siemens-docs-mcp
+# from a source checkout: <repo>/.venv/Scripts/siemens-docs-mcp  (Linux/macOS: <repo>/.venv/bin/siemens-docs-mcp)
 ```
 
-Output is written to the directory defined in the config (default: `output/siemens_tia_openness_v21/`).
+Pass settings with `-e`, e.g. `claude mcp add siemens-docs -e SIEMENS_DOCS_LOCALE=de-DE -- uvx siemens-docs-mcp`.
+
+Tools:
+
+| Tool                | Purpose                                                                   |
+|---------------------|---------------------------------------------------------------------------|
+| `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`).      |
+| `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
+| `get_toc`           | Table of contents of a publication or of the subtree under a topic URL.   |
+| `list_publications` | List publications; discover valid `product` / `version` values.           |
+
+Any reader URL returned by a tool (or copied from the browser) is valid input to `read_page` and `get_toc`.
+
+Environment variables:
+
+| Variable                     | Default  | Meaning                                                          |
+|------------------------------|----------|------------------------------------------------------------------|
+| `SIEMENS_DOCS_HOSTS`         | (none)   | Comma-separated extra hosts, appended to the built-in two (`docs.tia.siemens.cloud`, `docs.industrial-operations-x.siemens.cloud`). |
+| `SIEMENS_DOCS_LOCALE`        | `en-US`  | Default locale for search and listings.                          |
+| `SIEMENS_DOCS_MIN_INTERVAL`  | `0.3`    | Minimum seconds between requests to a host.                      |
+
+The publication catalog and TOCs are cached in memory (not on disk), so the first call per host takes a few seconds.
 
 ---
 
-## Output structure
+## Markdown export (CLI)
 
-The folder structure mirrors the documentation URL hierarchy:
+Export a whole publication to Markdown — one file per page, folders mirroring the navigation hierarchy. Create a config with any reader URL of the publication (a topic URL exports the whole publication):
+
+```yaml
+# my_docs.yaml
+name: tia_openness_v21
+url: "https://docs.tia.siemens.cloud/r/en-us/v21/tia-portal-openness-api-for-automation-of-engineering-workflows"
+output_dir: "output/tia_openness_v21"
+```
+
+```bash
+# Preview pages without writing files
+siemens-docs-export my_docs.yaml --dry-run
+
+# Export everything
+siemens-docs-export my_docs.yaml
+
+# Export a single page (for testing output quality)
+siemens-docs-export my_docs.yaml --page cybersecurity-information
+
+# Override the output directory / verbose logging
+siemens-docs-export my_docs.yaml --output /tmp/docs --verbose
+```
+
+A ready-made config lives in [`configs/`](https://github.com/Czarnak/siemens-docs-mcp/tree/main/configs) in the repository.
+
+### Output structure
 
 ```
-output/siemens_tia_openness_v21/
+output/tia_openness_v21/
 ├── index.md                          ← root page
 ├── cybersecurity-information.md
 ├── what-s-new-in-tia-portal-openness.md
@@ -85,31 +112,7 @@ output/siemens_tia_openness_v21/
 └── ...
 ```
 
----
-
-## Adding a new documentation site
-
-Create a config with any reader URL of the publication (a topic URL exports the whole publication):
-
-```yaml
-# configs/my_new_docs.yaml
-name: my_new_docs
-url: "https://docs.example.com/r/en/my-documentation"
-output_dir: "output/my_new_docs"
-```
-
-```bash
-python main.py configs/my_new_docs.yaml --dry-run   # verify pages found
-python main.py configs/my_new_docs.yaml             # scrape
-```
-
-The legacy form (`api_base` + `map_id` + `output_dir`) still works; if both forms are present, `url` wins.
-
-> **Note:** This tool currently supports Fluidtopics-based documentation portals only. Other platforms (MadCap Flare, Paligo, etc.) would require a different adapter.
-
----
-
-## Configuration reference
+### Configuration reference
 
 | Key          | Required | Description                                                                 |
 |--------------|----------|-----------------------------------------------------------------------------|
@@ -119,48 +122,32 @@ The legacy form (`api_base` + `map_id` + `output_dir`) still works; if both form
 | `map_id`     | Yes*     | Legacy: Fluidtopics map identifier (use with `api_base`).                   |
 | `output_dir` | Yes      | Directory where Markdown files will be written.                             |
 
-\* Either `url`, or `api_base` + `map_id`.
+\* Either `url`, or `api_base` + `map_id`. If both are present, `url` wins.
 
 ---
 
-## MCP server
+## How it works
 
-The same package ships an MCP server (stdio) that lets an AI assistant search and read Siemens documentation on demand.
+Fluidtopics (the platform behind both portals) exposes a REST API that the browser SPA uses internally. This package calls that API directly — no browser automation:
+
+1. **Catalog** — `GET /api/khub/maps` lists every publication; reader URLs are resolved against it.
+2. **Search** — `POST /api/khub/clustered-search` with product/version/locale filters.
+3. **TOC** — `GET /api/khub/maps/{mapId}/pages` returns the navigation tree.
+4. **Content** — `GET /api/khub/maps/{mapId}/topics/{contentId}/content` returns raw HTML, converted to Markdown with [markdownify](https://github.com/matthewwithanm/python-markdownify).
+
+Requests are throttled per host and retried once on 401/403/429/5xx.
+
+> **Note:** Only Fluidtopics-based portals are supported. Other platforms (MadCap Flare, Paligo, etc.) would need a different adapter.
+
+---
+
+## Development
 
 ```bash
-pip install -e .          # installs the `siemens-docs-mcp` console script
-claude mcp add siemens-docs -- <repo>/.venv/Scripts/siemens-docs-mcp
-# Linux/macOS: <repo>/.venv/bin/siemens-docs-mcp
+python -m pytest -q          # offline tests
+python -m pytest -m live -q  # live smoke tests against the real hosts
+ruff check .
 ```
-
-Tools:
-
-| Tool                | Purpose                                                                   |
-|---------------------|---------------------------------------------------------------------------|
-| `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`).      |
-| `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
-| `get_toc`           | Table of contents of a publication or of the subtree under a topic URL.   |
-| `list_publications` | List publications; discover valid `product` / `version` values.           |
-
-Environment variables:
-
-| Variable                     | Default  | Meaning                                                          |
-|------------------------------|----------|------------------------------------------------------------------|
-| `SIEMENS_DOCS_HOSTS`         | (none)   | Comma-separated extra hosts, appended to the built-in two (`docs.tia.siemens.cloud`, `docs.industrial-operations-x.siemens.cloud`). |
-| `SIEMENS_DOCS_LOCALE`        | `en-US`  | Default locale for search and listings.                          |
-| `SIEMENS_DOCS_MIN_INTERVAL`  | `0.3`    | Minimum seconds between requests to a host.                      |
-
-The publication catalog and TOCs are cached in memory (not on disk), so the first call per host takes a few seconds.
-
-Live smoke tests against the real hosts: `python -m pytest -m live`.
-
----
-
-## Included configs
-
-| Config file                          | Documentation                        | Version |
-|--------------------------------------|--------------------------------------|---------|
-| `siemens_tia_openness_v21.yaml`      | Siemens TIA Portal Openness API      | v21     |
 
 ---
 
