@@ -31,3 +31,11 @@ def test_output_paths() -> None:
         "dup.md",
         "dup-2.md",
     ], rel
+
+
+def test_multi_entry_toc_gets_synthetic_root() -> None:
+    """Publications without a root topic (IOX) list each top-level section as its own paginatedToc entry."""
+    toc = parse_toc({"paginatedToc": [_node("A", "/a", [_node("A1", "/a/a1")]), _node("B", "/b")]})
+    assert toc.content_id == "" and toc.pretty_url == BASE
+    assert [(p.title, p.depth) for p in iter_pages(toc)] == [("", 0), ("A", 1), ("A1", 2), ("B", 1)]
+    assert [p.segments for p in iter_pages(toc)][1:] == [("a",), ("a", "a1"), ("b",)]

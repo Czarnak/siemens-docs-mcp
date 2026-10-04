@@ -105,7 +105,7 @@ def read_page(catalog: Catalog, url: str, offset: int = 0, max_chars: int = 2000
     except KeyError:
         raise CatalogError(f"Publication {res.map_id} not found on {res.host}.") from None
     root = catalog.toc(res.host, res.map_id)
-    content_id = res.content_id or root.content_id
+    content_id = res.content_id or root.content_id or root.children[0].content_id
     path = find_path(root, content_id)
     if path:
         title, source = path[-1].title, catalog.reader_url(res.host, res.map_id, path[-1])

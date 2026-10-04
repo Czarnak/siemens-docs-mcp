@@ -81,33 +81,21 @@ output/siemens_tia_openness_v21/
 
 ## Adding a new documentation site
 
-### Step 1 — Find the `map_id`
-
-1. Open the target documentation URL in Chrome.
-2. Open DevTools → **Network** tab → filter by **`khub`**.
-3. Reload the page and look for a request matching: `/api/khub/maps/{MAP_ID}/pages`
-4. Copy the `MAP_ID` value.
-
-### Step 2 — Create a config file
+Create a config with any reader URL of the publication (a topic URL exports the whole publication):
 
 ```yaml
 # configs/my_new_docs.yaml
-
 name: my_new_docs
-
-base_url: "https://docs.example.com/r/en/my-documentation"
-api_base: "https://docs.example.com"
-map_id:   "your-map-id-here"
-
+url: "https://docs.example.com/r/en/my-documentation"
 output_dir: "output/my_new_docs"
 ```
-
-### Step 3 — Run
 
 ```bash
 python main.py configs/my_new_docs.yaml --dry-run   # verify pages found
 python main.py configs/my_new_docs.yaml             # scrape
 ```
+
+The legacy form (`api_base` + `map_id` + `output_dir`) still works; if both forms are present, `url` wins.
 
 > **Note:** This tool currently supports Fluidtopics-based documentation portals only. Other platforms (MadCap Flare, Paligo, etc.) would require a different adapter.
 
@@ -115,13 +103,48 @@ python main.py configs/my_new_docs.yaml             # scrape
 
 ## Configuration reference
 
-| Key          | Required | Description                                                        |
-|--------------|----------|--------------------------------------------------------------------|
-| `name`       | No       | Human-readable label shown in log output.                          |
-| `base_url`   | Yes      | Full URL of the documentation root page.                           |
-| `api_base`   | Yes      | Root URL of the Fluidtopics instance (no trailing slash).          |
-| `map_id`     | Yes      | Fluidtopics map identifier (see "Adding a new site" above).        |
-| `output_dir` | Yes      | Directory where Markdown files will be written.                    |
+| Key          | Required | Description                                                                 |
+|--------------|----------|-----------------------------------------------------------------------------|
+| `name`       | No       | Human-readable label shown in log output.                                   |
+| `url`        | Yes*     | Any reader URL of the publication (resolved to its map automatically).      |
+| `api_base`   | Yes*     | Legacy: root URL of the Fluidtopics instance (use with `map_id`).           |
+| `map_id`     | Yes*     | Legacy: Fluidtopics map identifier (use with `api_base`).                   |
+| `output_dir` | Yes      | Directory where Markdown files will be written.                             |
+
+\* Either `url`, or `api_base` + `map_id`.
+
+---
+
+## MCP server
+
+The same package ships an MCP server (stdio) that lets an AI assistant search and read Siemens documentation on demand.
+
+```bash
+pip install -e .          # installs the `siemens-docs-mcp` console script
+claude mcp add siemens-docs -- <repo>/.venv/Scripts/siemens-docs-mcp
+# Linux/macOS: <repo>/.venv/bin/siemens-docs-mcp
+```
+
+Tools:
+
+| Tool                | Purpose                                                                   |
+|---------------------|---------------------------------------------------------------------------|
+| `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`).      |
+| `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
+| `get_toc`           | Table of contents of a publication or of the subtree under a topic URL.   |
+| `list_publications` | List publications; discover valid `product` / `version` values.           |
+
+Environment variables:
+
+| Variable                     | Default  | Meaning                                                          |
+|------------------------------|----------|------------------------------------------------------------------|
+| `SIEMENS_DOCS_HOSTS`         | (none)   | Comma-separated extra hosts, appended to the built-in two (`docs.tia.siemens.cloud`, `docs.industrial-operations-x.siemens.cloud`). |
+| `SIEMENS_DOCS_LOCALE`        | `en-US`  | Default locale for search and listings.                          |
+| `SIEMENS_DOCS_MIN_INTERVAL`  | `0.3`    | Minimum seconds between requests to a host.                      |
+
+The publication catalog and TOCs are cached in memory (not on disk), so the first call per host takes a few seconds.
+
+Live smoke tests against the real hosts: `python -m pytest -m live`.
 
 ---
 

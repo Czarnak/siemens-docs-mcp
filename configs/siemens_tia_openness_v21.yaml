@@ -1,22 +1,9 @@
 # docs-scraper configuration — Siemens TIA Portal Openness API v21
-# -----------------------------------------------------------------------
-# How to find the map_id for a different documentation version:
-#   1. Open the target documentation URL in Chrome
-#   2. Open DevTools → Network tab → filter by "khub"
-#   3. Look for a request matching: /api/khub/maps/{MAP_ID}/pages
-#   4. Copy the MAP_ID value and paste it below
-# -----------------------------------------------------------------------
 
 name: siemens_tia_openness_v21
 
-# Full URL of the documentation root page
-base_url: "https://docs.tia.siemens.cloud/r/en-us/v21/tia-portal-openness-api-for-automation-of-engineering-workflows"
-
-# Root URL of the Fluidtopics instance (no trailing slash)
-api_base: "https://docs.tia.siemens.cloud"
-
-# Fluidtopics map identifier (see instructions above)
-map_id: "gpR5ZkKnLSuzVoGX1ovoKg"
+# Any reader URL of the publication (a topic URL still exports the whole publication)
+url: "https://docs.tia.siemens.cloud/r/en-us/v21/tia-portal-openness-api-for-automation-of-engineering-workflows"
 
 # Directory where Markdown files will be written
 # Relative paths are resolved from the working directory where main.py is run

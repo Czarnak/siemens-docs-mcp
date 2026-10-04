@@ -1,5 +1,8 @@
 """docs-scraper — CLI entry point.
 
+Config: ``url`` (any reader URL of the publication) or legacy ``api_base`` + ``map_id``,
+plus ``output_dir``.
+
 Usage examples::
 
     # Scrape everything defined in a config
@@ -22,15 +25,17 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
 import yaml
 
+from scraper.catalog import Catalog
 from scraper.client import FluidtopicsClient
 from scraper.content import fetch_html
 from scraper.converter import html_to_markdown
-from scraper.toc import TocPage, count_pages, iter_pages, parse_toc
+from scraper.toc import TocPage, iter_pages, parse_toc
 from scraper.writer import resolve_output_paths, write_page
 
 log = logging.getLogger(__name__)
@@ -46,10 +51,22 @@ def _load_config(config_path: Path) -> dict:
 
 
 def _validate_config(config: dict) -> None:
-    required = ("base_url", "api_base", "map_id", "output_dir")
-    missing = [k for k in required if not config.get(k)]
-    if missing:
-        raise ValueError(f"Config is missing required keys: {missing}")
+    if not config.get("output_dir"):
+        raise ValueError("Config is missing required key: 'output_dir'")
+    if not (config.get("url") or (config.get("api_base") and config.get("map_id"))):
+        raise ValueError("Config needs either url or api_base + map_id")
+
+
+def _resolve_target(config: dict, catalog_factory: Callable[[str], Catalog]) -> tuple[str, str]:
+    """Return ``(host, map_id)``; ``url`` wins over the legacy ``api_base`` + ``map_id``."""
+    if url := config.get("url"):
+        if config.get("api_base") or config.get("map_id"):
+            log.info("Both 'url' and legacy api_base/map_id given — using 'url'")
+        res = catalog_factory(urlparse(url).hostname).resolve(url)
+        if res.content_id:
+            log.warning("URL points at a single topic — the whole publication is exported")
+        return res.host, res.map_id
+    return urlparse(config["api_base"]).hostname, config["map_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -67,27 +84,33 @@ def run(config: dict, dry_run: bool = False, output_override: str | None = None,
     """
     _validate_config(config)
 
-    api_base: str = config["api_base"]
-    map_id: str = config["map_id"]
+    catalogs: list[Catalog] = []
+
+    def catalog_factory(host: str) -> Catalog:
+        catalogs.append(Catalog([host], lambda h: FluidtopicsClient(h)))
+        return catalogs[0]
+
+    host, map_id = _resolve_target(config, catalog_factory)
     output_dir = Path(output_override or config["output_dir"])
 
     log.info("Config  : %s", config.get("name", "unnamed"))
-    log.info("API base: %s", api_base)
+    log.info("Host    : %s", host)
     log.info("Map ID  : %s", map_id)
     log.info("Output  : %s", output_dir)
 
-    with FluidtopicsClient(urlparse(api_base).hostname) as client:
+    # Reuse the catalog's client (shared throttle) for the url form.
+    with catalogs[0].client(host) if catalogs else FluidtopicsClient(host) as client:
 
         # ---- Step 1: fetch TOC ----
         log.info("Fetching TOC…")
         pages_response = client.get_pages(map_id)
         root: TocPage = parse_toc(pages_response)
-        total = count_pages(root)
+        total = sum(1 for p in iter_pages(root) if p.content_id)
         log.info("TOC loaded — %d pages found", total)
 
         # ---- Step 2: apply page filter ----
         # Resolve paths over the full TOC so collision suffixes don't depend on --page.
-        all_pages = list(iter_pages(root))
+        all_pages = [p for p in iter_pages(root) if p.content_id]  # skips the synthetic root
         targets = list(zip(all_pages, resolve_output_paths(all_pages, output_dir), strict=True))
         if page_filter:
             targets = [(p, path) for p, path in targets if p.pretty_url.endswith(page_filter)]

@@ -57,8 +57,14 @@ def parse_toc(pages_response: dict) -> TocPage:
             "Unexpected /pages response — 'paginatedToc' is missing or empty.\n"
             f"Keys present: {list(pages_response.keys())}"
         )
-    root_raw = paginated[0]
-    return _parse_node(root_raw, depth=0)
+    if len(paginated) > 1:
+        # No root topic: each top-level section is its own entry. Add an empty-id root
+        # (pretty_url = the sections' common parent) so every section keeps a parent.
+        first = paginated[0]["prettyUrl"]
+        root = TocPage("", "", "", first.rsplit("/", 1)[0], 0)
+        root.children = [_parse_node(n, depth=1, parent=root) for n in paginated]
+        return root
+    return _parse_node(paginated[0], depth=0)
 
 
 def iter_pages(root: TocPage) -> Iterator[TocPage]:
