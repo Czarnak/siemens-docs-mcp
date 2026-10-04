@@ -217,7 +217,9 @@ def make_hit(
 
 
 def make_search_response(clusters: list[dict], total: int | None = None) -> dict:
-    return {"totalResultsCount": len(clusters) if total is None else total, "results": clusters}
+    # Real API shape: totals live under "paging" (verified live 2026-10-04).
+    total = len(clusters) if total is None else total
+    return {"paging": {"currentPage": 1, "totalResultsCount": total}, "results": clusters}
 
 
 def make_big_toc(n: int, content_id: str = "big-root") -> dict:

@@ -67,7 +67,8 @@ def search_docs(
             topics.append(topic)
     if not topics:
         return f'No results for "{query}" on {host}.'
-    header = f'Found {data.get("totalResultsCount", len(topics))} results for "{query}" on {host}. Showing {len(topics)}:'
+    total = data.get("paging", {}).get("totalResultsCount", len(topics))
+    header = f'Found {total} results for "{query}" on {host}. Showing {len(topics)}:'
     return "\n".join([header, *(_format_hit(i, t) for i, t in enumerate(topics, 1))])
 
 
