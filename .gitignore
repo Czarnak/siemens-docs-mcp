@@ -28,3 +28,7 @@ Thumbs.db
 # Ruff / mypy caches
 .ruff_cache/
 .mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
