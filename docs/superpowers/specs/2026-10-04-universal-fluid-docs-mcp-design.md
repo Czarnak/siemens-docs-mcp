@@ -190,8 +190,10 @@ Reader URL for a TOC node: `https://{host}{prettyUrl}` when present, else
 
 ## 9. Testing
 
-- Move `test_scraper.py` checks into `tests/` and run with `pytest` (dev dependency in
-  `requirements-dev.txt`).
+- Dependencies move from `requirements.txt` to `pyproject.toml` (amended 2026-10-04); dev
+  tools in the `dev` optional-dependency extra: `pytest`, `ruff`, `pip-audit`. CI runs
+  `pip-audit --skip-editable` alongside the tests.
+- Move `test_scraper.py` checks into `tests/` and run with `pytest`.
 - **Offline unit tests** with trimmed real fixtures in `tests/fixtures/`: catalog slice
   (both hosts), one `/pages` TOC, one search response, HTML from TIA Openness, STEP 7/SCL and
   an IOX admonition page. HTTP mocked with `httpx.MockTransport` (no new dependency).

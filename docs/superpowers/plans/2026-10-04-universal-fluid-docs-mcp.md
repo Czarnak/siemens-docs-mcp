@@ -6,7 +6,7 @@
 
 **Architecture:** A per-host HTTP client (throttle, session, retry) feeds an in-memory `Catalog` (map list, URL resolution, filter canonicalization, TOC cache). Pure tool functions in `scraper/tools.py` turn catalog + client output into Markdown strings; `server.py` registers them with the MCP SDK and maps errors to `ToolError`. `main.py` (CLI) uses the same client and catalog.
 
-**Tech Stack:** Python 3.12, httpx, BeautifulSoup4, markdownify, PyYAML, MCP Python SDK v2 (`mcp>=2,<3`, `from mcp.server import MCPServer`), pytest + anyio plugin, ruff.
+**Tech Stack:** Python 3.12, httpx, BeautifulSoup4, markdownify, PyYAML, MCP Python SDK v2 (`mcp>=2,<3`, `from mcp.server import MCPServer`), pytest + anyio plugin, ruff, pip-audit; packaging via `pyproject.toml` (setuptools).
 
 **Spec:** `docs/superpowers/specs/2026-10-04-universal-fluid-docs-mcp-design.md`
 
@@ -22,7 +22,8 @@
 - Search filters: product → key `Product`; version → key `tia:SoftwareVersionFilter` or `SoftwareVersion` (whichever the canonical value came from). Values are matched exactly server-side, so always canonicalize first.
 - Code fences from the converter carry no language tag.
 - Tool failures surface as `mcp.server.mcpserver.exceptions.ToolError` with a human-readable message; no stack traces to the agent.
-- No new runtime dependency other than `mcp`; dev deps: `pytest`, `ruff`.
+- Dependencies live only in `pyproject.toml` (no `requirements*.txt`). No new runtime dependency other than `mcp`; dev extra `dev` = `pytest>=9`, `ruff`, `pip-audit>=2.10`. Install: `python -m pip install -e ".[dev]"`.
+- Any task that changes dependencies runs `python -m pip_audit --skip-editable` and must end with no known vulnerabilities.
 - Use the project venv: `.venv/Scripts/python.exe` (Windows). Commands below write `python` for brevity.
 
 ## Review Focus
@@ -48,37 +49,56 @@
 | `server.py` (new) | `Settings`, `load_settings`, `build_server`, `main`. |
 | `main.py` (modify) | `url:` config, shared client/catalog. |
 | `tests/` (new) | `conftest.py`, `test_toc_writer.py`, `test_converter.py`, `test_client.py`, `test_catalog.py`, `test_tools.py`, `test_server.py`, `test_cli.py`, `test_live.py`, `fixtures/html/*.html`. |
-| `pytest.ini`, `requirements-dev.txt` (new); `requirements.txt`, `.github/workflows/ci.yml`, `README.md`, `configs/siemens_tia_openness_v21.yaml` (modify). |
+| `pyproject.toml` (new — dependencies, dev extra, pytest config, console script); `.github/workflows/ci.yml`, `README.md`, `configs/siemens_tia_openness_v21.yaml` (modify). |
+| `requirements.txt` (delete — replaced by `pyproject.toml`). |
 | `test_scraper.py` (delete — moved to `tests/`). |
 
 ---
 
-### Task 1: pytest infrastructure and test migration
+### Task 1: pyproject.toml, pytest infrastructure and test migration
 
 **Files:**
-- Create: `pytest.ini`, `requirements-dev.txt`, `tests/__init__.py` (empty), `tests/test_toc_writer.py`, `tests/test_converter.py`
-- Modify: `.github/workflows/ci.yml`
-- Delete: `test_scraper.py`
+- Create: `pyproject.toml`, `tests/__init__.py` (empty), `tests/test_toc_writer.py`, `tests/test_converter.py`
+- Modify: `.github/workflows/ci.yml`, `README.md` (Installation section only)
+- Delete: `requirements.txt`, `test_scraper.py`
 
 **Interfaces:**
-- Produces: `pytest` runs from repo root with marker `live` deselected by default.
+- Produces: dependencies declared only in `pyproject.toml`; `python -m pip install -e ".[dev]"` installs runtime + dev tools; `pytest` runs from repo root with marker `live` deselected by default; `pip-audit` available.
 
-- [ ] **Step 1: Add config files**
+- [ ] **Step 1: Write `pyproject.toml`** (replaces `requirements.txt`; same runtime floors)
 
-`pytest.ini`:
-```ini
-[pytest]
-testpaths = tests
-addopts = -m "not live"
-markers =
-    live: hits real Fluid Topics hosts (run with: pytest -m live)
+```toml
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "siemens-docs-mcp"
+version = "0.1.0"
+description = "Search and read Siemens Fluid Topics documentation via MCP or export it to Markdown"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "markdownify>=0.13.1",
+    "PyYAML>=6.0.1",
+    "lxml>=5.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9", "ruff", "pip-audit>=2.10"]
+
+[tool.setuptools]
+packages = ["scraper"]
+py-modules = ["main"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = '-m "not live"'
+markers = ["live: hits real Fluid Topics hosts (run with: pytest -m live)"]
 ```
-`requirements-dev.txt`:
-```
--r requirements.txt
-pytest>=9
-ruff
-```
+Dev tools use `optional-dependencies` rather than PEP 735 `[dependency-groups]` because the project venv has pip 25.0.1, which cannot install groups (needs ≥ 25.1). `git rm requirements.txt`.
 
 - [ ] **Step 2: Move tests**
 
@@ -86,18 +106,18 @@ Move `test_output_paths` into `tests/test_toc_writer.py` and `test_code_table_is
 
 - [ ] **Step 3: Run**
 
-Run: `python -m pip install -r requirements-dev.txt && python -m pytest -q`
-Expected: `2 passed`
+Run: `python -m pip install -e ".[dev]" && python -m pytest -q && python -m pip_audit --skip-editable`
+Expected: `2 passed`; pip-audit prints `No known vulnerabilities found`. If it reports vulnerabilities, raise the affected floor in `pyproject.toml` and re-run; do not ignore.
 
-- [ ] **Step 4: CI**
+- [ ] **Step 4: CI and README**
 
-In `.github/workflows/ci.yml`: install with `pip install -r requirements-dev.txt`; replace the "Verify imports resolve" step with `python -m pytest -q`; keep ruff and `python main.py --help`.
+In `.github/workflows/ci.yml`: install with `pip install -e ".[dev]"`; replace the "Verify imports resolve" step with `python -m pytest -q`; add a step `pip-audit --skip-editable`; keep ruff and `python main.py --help`. In `README.md` Installation, replace `pip install -r requirements.txt` with `pip install -e .` (and `pip install -e ".[dev]"` for development).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A pytest.ini requirements-dev.txt tests .github/workflows/ci.yml test_scraper.py
-git commit -m "test: move checks to pytest and run them in CI"
+git add -A pyproject.toml requirements.txt tests .github/workflows/ci.yml README.md test_scraper.py
+git commit -m "build: move dependencies to pyproject.toml and tests to pytest"
 ```
 
 ---
@@ -396,7 +416,11 @@ git commit -m "feat: read_page and get_toc tool logic"
 
 **Files:**
 - Create: `server.py`, `tests/test_server.py`
-- Modify: `requirements.txt` (add `mcp>=2,<3`)
+- Modify: `pyproject.toml` — add `"mcp>=2,<3"` to `dependencies`; `py-modules = ["main", "server"]`; add
+  ```toml
+  [project.scripts]
+  siemens-docs-mcp = "server:main"
+  ```
 
 **Interfaces:**
 - Consumes: `scraper.tools.*` (Tasks 5–6), `Catalog` (Task 4), `FluidtopicsClient` (Task 3).
@@ -421,16 +445,18 @@ async def test_search_defaults_host_and_locale(server, fake_tia): ...  # call se
 ```
 `server` fixture = `build_server(catalog_from_conftest, Settings(DEFAULT_HOSTS, "en-US", 0.0))`.
 
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** (`pip install -r requirements.txt` first). **Step 4: Run** `python -m pytest -q` → pass.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** (update `pyproject.toml`, then `python -m pip install -e ".[dev]"`). **Step 4: Run** `python -m pytest -q` → pass.
 
-- [ ] **Step 5: Stdio smoke check**
+- [ ] **Step 5: Dependency audit and smoke check**
 
+Run: `python -m pip_audit --skip-editable` → `No known vulnerabilities found` (new dependency `mcp` and its transitive deps).
 Run: `python -c "import server; print('ok')"` → `ok` (import must not start the server).
+Run (PowerShell): `Get-Command siemens-docs-mcp` → resolves to the venv `Scripts` folder (console script installed).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add server.py tests/test_server.py requirements.txt
+git add server.py tests/test_server.py pyproject.toml
 git commit -m "feat: MCP server exposing Fluid Topics docs tools"
 ```
 
@@ -467,13 +493,14 @@ Run: `python main.py configs/siemens_tia_openness_v21.yaml --dry-run --page cybe
 
 Replace "Adding a new documentation site / Step 1 — Find the map_id" with the `url:` form; add an "MCP server" section: install, the four tools, env vars table (Global Constraints), and a Claude Code registration example:
 ```bash
-claude mcp add siemens-docs -- <path-to-venv-python> <repo>/server.py
+claude mcp add siemens-docs -- <repo>/.venv/Scripts/siemens-docs-mcp
 ```
+(console script from `pyproject.toml`; on Linux/macOS `<repo>/.venv/bin/siemens-docs-mcp`).
 Update the configuration reference table (`url` or legacy `api_base`+`map_id`). State that the cache is in-memory and the first call per host takes a few seconds.
 
 - [ ] **Step 6: Full check**
 
-Run: `ruff check . && python -m pytest -q` → clean, all pass.
+Run: `ruff check . && python -m pytest -q && python -m pip_audit --skip-editable` → clean, all pass, no known vulnerabilities.
 
 - [ ] **Step 7: Commit**
 
