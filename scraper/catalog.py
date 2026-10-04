@@ -84,6 +84,8 @@ class Catalog:
         self._maps: dict[str, tuple[float, dict[str, MapInfo]]] = {}
         # Raw distinct version values per host per key (a map can carry both keys).
         self._versions: dict[str, dict[str, list[str]]] = {}
+        # Raw version values per host per map id per key, for filter().
+        self._map_versions: dict[str, dict[str, dict[str, str]]] = {}
         self._tocs: dict[tuple[str, str], tuple[float, TocPage]] = {}
 
     def _check_host(self, host: str) -> str:
@@ -109,13 +111,18 @@ class Catalog:
         raws = self.client(host).list_maps()
         infos = {m.id: m for m in map(_map_info, raws)}
         versions: dict[str, list[str]] = {k: [] for k in _VERSION_KEYS}
+        per_map: dict[str, dict[str, str]] = {}
         for raw in raws:
             meta = _meta(raw)
+            per_map[raw["id"]] = {}
             for key in _VERSION_KEYS:
                 v = _first(meta, key)
-                if v and v not in versions[key]:
-                    versions[key].append(v)
+                if v:
+                    per_map[raw["id"]][key] = v
+                    if v not in versions[key]:
+                        versions[key].append(v)
         self._versions[host] = versions
+        self._map_versions[host] = per_map
         self._maps[host] = (self._clock(), infos)
         return infos
 
@@ -158,7 +165,8 @@ class Catalog:
             result = [m for m in result if m.locale == loc]
         if version is not None:
             key, v = self.canonical_version(host, version)
-            result = [m for m in result if m.version == v and m.version_key == key]
+            per_map = self._map_versions[host.lower()]
+            result = [m for m in result if per_map[m.id].get(key) == v]
         if title_contains:
             needle = title_contains.lower()
             result = [m for m in result if needle in m.title.lower()]

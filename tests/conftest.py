@@ -6,7 +6,7 @@ import pytest
 from scraper.catalog import Catalog
 
 TIA_HOST = "docs.tia.siemens.cloud"
-IOX_HOST = "iox.docs.siemens.com"
+IOX_HOST = "docs.industrial-operations-x.siemens.cloud"
 
 
 def make_map(

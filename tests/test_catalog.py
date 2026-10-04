@@ -140,6 +140,15 @@ def test_canonical_version_falls_back_to_second_key(fake_tia):
     cat = Catalog([TIA_HOST], lambda h: fake_tia)
     assert cat.canonical_version(TIA_HOST, "21.0.1") == ("SoftwareVersion", "21.0.1")
     assert cat.canonical_version(TIA_HOST, "v21") == ("tia:SoftwareVersionFilter", "V21")
+    assert [m.id for m in cat.filter(TIA_HOST, version="21.0.1")] == ["b"]
+    assert [m.id for m in cat.filter(TIA_HOST, version="v21")] == ["b"]
+
+
+def test_filter_excludes_map_with_value_under_other_key(fake_tia):
+    only_sw = make_map("s", "OnlySw", version="V21", version_key="SoftwareVersion")
+    fake_tia.maps = [make_map("f", "Filt", version="V21"), only_sw]
+    cat = Catalog([TIA_HOST], lambda h: fake_tia)
+    assert [m.id for m in cat.filter(TIA_HOST, version="v21")] == ["f"]
 
 
 def test_canonical_version_unknown(catalog):
