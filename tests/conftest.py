@@ -200,3 +200,9 @@ def make_hit(
 
 def make_search_response(clusters: list[dict], total: int | None = None) -> dict:
     return {"totalResultsCount": len(clusters) if total is None else total, "results": clusters}
+
+
+def make_big_toc(n: int, content_id: str = "big-root") -> dict:
+    """/pages response with ``n`` flat children under the root (n + 1 nodes)."""
+    kids = [make_node(f"bt{i}", f"big-p{i}", f"Topic {i}", f"/r/big/t{i}") for i in range(n)]
+    return make_toc(content_id, "Big", "/r/big", kids)
