@@ -219,6 +219,9 @@ class Catalog:
         raise failure
 
     def reader_url(self, host: str, map_id: str, page: TocPage) -> str:
+        if not page.content_id:  # synthetic root of a multi-section TOC = the publication itself
+            info = self.maps(host).get(map_id)
+            return f"https://{host}/r/{info.pretty_url if info and info.pretty_url else map_id}"
         if page.pretty_url:
             return f"https://{host}{page.pretty_url}"
         return f"https://{host}/r/{map_id}/{page.content_id}"

@@ -145,13 +145,16 @@ def fake_iox() -> FakeClient:
             ),
         ],
     )
-    client.pages["iox1"] = make_toc(
-        "iox1-root",
-        "Edge Guide",
-        "/r/en-us/edge/guide",
-        [make_node("i-p1", "iox1-p1", "Intro", "/r/en-us/edge/guide/intro")],
-    )
+    # No root topic: each top-level section is its own paginatedToc entry.
+    client.pages["iox1"] = {
+        "paginatedToc": [
+            make_node("i-s1", "iox1-p1", "Intro", "/r/en-us/edge/guide/intro",
+                      [make_node("i-s1a", "iox1-p1a", "Intro A", "/r/en-us/edge/guide/intro/a")]),
+            make_node("i-s2", "iox1-p2", "Setup", "/r/en-us/edge/guide/setup"),
+        ]
+    }
     client.contents[("iox1", "iox1-p1")] = "<h1>Intro</h1>"
+    client.contents[("iox1", "iox1-p1a")] = "<h1>Intro A</h1>"
     return client
 
 

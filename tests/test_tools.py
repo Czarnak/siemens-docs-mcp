@@ -196,3 +196,22 @@ def test_get_toc_line_cap(catalog, fake_tia):
     lines = out.splitlines()
     assert len(lines) == 501
     assert lines[-1] == "… truncated at 500 lines — use a deeper URL or a smaller depth."
+
+
+IOX_PUB = f"https://{IOX_HOST}/r/en-us/edge/guide"
+
+
+def test_get_toc_multi_root_labels_publication(catalog):
+    out = get_toc(catalog, IOX_PUB, depth=1)
+    assert out.splitlines()[0] == f"- Edge Guide — {IOX_PUB}"
+    assert "- Intro — " in out and "- Setup — " in out
+
+
+def test_read_page_multi_root_topic_path_has_no_empty_segment(catalog):
+    out = read_page(catalog, f"{IOX_PUB}/intro/a")
+    assert "> Path: Edge Guide > Intro > Intro A" in out
+
+
+def test_read_page_multi_root_bare_url(catalog):
+    out = read_page(catalog, IOX_PUB)
+    assert "> Path: Edge Guide > Intro" in out.splitlines()

@@ -109,7 +109,7 @@ def read_page(catalog: Catalog, url: str, offset: int = 0, max_chars: int = 2000
     path = find_path(root, content_id)
     if path:
         title, source = path[-1].title, catalog.reader_url(res.host, res.map_id, path[-1])
-        titles = [p.title for p in path]
+        titles = [p.title or info.title for p in path]
     else:
         title, source = "(untitled topic)", f"https://{res.host}/r/{res.map_id}/{content_id}"
         titles = [info.title]
@@ -135,6 +135,7 @@ def get_toc(catalog: Catalog, url: str, depth: int = 2) -> str:
         raise ValueError(f"depth must be 1-{MAX_DEPTH}, got {depth}")
     res = catalog.resolve(url)
     root = catalog.toc(res.host, res.map_id)
+    pub_title = catalog.maps(res.host)[res.map_id].title
     start = root
     if res.content_id is not None:
         path = find_path(root, res.content_id)
@@ -146,7 +147,7 @@ def get_toc(catalog: Catalog, url: str, depth: int = 2) -> str:
     lines: list[str] = []
 
     def walk(node: TocPage, level: int) -> None:
-        lines.append(f"{'  ' * level}- {node.title} — {catalog.reader_url(res.host, res.map_id, node)}")
+        lines.append(f"{'  ' * level}- {node.title or pub_title} — {catalog.reader_url(res.host, res.map_id, node)}")
         if level < depth:
             for child in node.children:
                 walk(child, level + 1)
