@@ -16,7 +16,7 @@ def test_load_settings_extra_hosts():
     assert s.hosts == DEFAULT_HOSTS + ("docs.example.com",)
 
 
-@pytest.mark.parametrize("bad", ["-1", "abc"])
+@pytest.mark.parametrize("bad", ["-1", "abc", "inf", "nan"])
 def test_load_settings_bad_interval(bad):
     with pytest.raises(ValueError):
         load_settings({"SIEMENS_DOCS_MIN_INTERVAL": bad})
@@ -49,3 +49,11 @@ async def test_search_defaults_host_and_locale(server, fake_tia):
         result = await client.call_tool("search_docs", {"query": "x"})
     assert not result.is_error
     assert fake_tia.search_calls[0]["locale"] == "en-US"
+
+
+@pytest.mark.anyio
+async def test_descriptions_list_configured_hosts(catalog):
+    settings = Settings((*DEFAULT_HOSTS, "docs.example.com"), "en-US", 0.0)
+    async with Client(build_server(catalog, settings)) as client:
+        tools = (await client.list_tools()).tools
+    assert all("docs.example.com" in (t.description or "") for t in tools)

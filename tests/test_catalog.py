@@ -179,3 +179,39 @@ def test_find_path_returns_root_to_node():
     assert [p.content_id for p in find_path(root, "cb")] == ["r", "ca", "cb"]
     assert [p.content_id for p in find_path(root, "r")] == ["r"]
     assert find_path(root, "zzz") is None
+
+
+def test_concurrent_cold_loads_happen_once(fake_tia, fake_iox):
+    import threading
+    import time
+
+    created: list[str] = []
+    clients = {TIA_HOST: fake_tia, IOX_HOST: fake_iox}
+
+    def factory(host):
+        time.sleep(0.05)  # widen the race window
+        created.append(host)
+        return clients[host]
+
+    orig = fake_tia.list_maps
+
+    def slow_list_maps():
+        time.sleep(0.05)
+        return orig()
+
+    fake_tia.list_maps = slow_list_maps
+    cat = Catalog([TIA_HOST, IOX_HOST], factory)
+    barrier = threading.Barrier(8)
+
+    def work():
+        barrier.wait()
+        cat.client(TIA_HOST)
+        cat.maps(TIA_HOST)
+
+    threads = [threading.Thread(target=work) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert created == [TIA_HOST]
+    assert fake_tia.list_maps_calls == 1

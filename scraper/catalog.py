@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import difflib
 import logging
+import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -80,6 +81,8 @@ class Catalog:
         self._factory = client_factory
         self._ttl = ttl_seconds
         self._clock = clock
+        # ponytail: global lock serializes cold catalog loads across hosts; per-host locks if that hurts
+        self._lock = threading.RLock()  # re-entrant: maps()/toc() call client() while holding it
         self._clients: dict[str, FluidtopicsClient] = {}
         self._maps: dict[str, tuple[float, dict[str, MapInfo]]] = {}
         # Raw distinct version values per host per key (a map can carry both keys).
@@ -96,35 +99,37 @@ class Catalog:
 
     def client(self, host: str) -> FluidtopicsClient:
         host = self._check_host(host)
-        if host not in self._clients:
-            self._clients[host] = self._factory(host)
-        return self._clients[host]
+        with self._lock:
+            if host not in self._clients:
+                self._clients[host] = self._factory(host)
+            return self._clients[host]
 
     def _fresh(self, stamp: float) -> bool:
         return self._clock() - stamp <= self._ttl
 
     def maps(self, host: str) -> dict[str, MapInfo]:
         host = self._check_host(host)
-        cached = self._maps.get(host)
-        if cached and self._fresh(cached[0]):
-            return cached[1]
-        raws = self.client(host).list_maps()
-        infos = {m.id: m for m in map(_map_info, raws)}
-        versions: dict[str, list[str]] = {k: [] for k in _VERSION_KEYS}
-        per_map: dict[str, dict[str, str]] = {}
-        for raw in raws:
-            meta = _meta(raw)
-            per_map[raw["id"]] = {}
-            for key in _VERSION_KEYS:
-                v = _first(meta, key)
-                if v:
-                    per_map[raw["id"]][key] = v
-                    if v not in versions[key]:
-                        versions[key].append(v)
-        self._versions[host] = versions
-        self._map_versions[host] = per_map
-        self._maps[host] = (self._clock(), infos)
-        return infos
+        with self._lock:
+            cached = self._maps.get(host)
+            if cached and self._fresh(cached[0]):
+                return cached[1]
+            raws = self.client(host).list_maps()
+            infos = {m.id: m for m in map(_map_info, raws)}
+            versions: dict[str, list[str]] = {k: [] for k in _VERSION_KEYS}
+            per_map: dict[str, dict[str, str]] = {}
+            for raw in raws:
+                meta = _meta(raw)
+                per_map[raw["id"]] = {}
+                for key in _VERSION_KEYS:
+                    v = _first(meta, key)
+                    if v:
+                        per_map[raw["id"]][key] = v
+                        if v not in versions[key]:
+                            versions[key].append(v)
+            self._versions[host] = versions
+            self._map_versions[host] = per_map
+            self._maps[host] = (self._clock(), infos)
+            return infos
 
     @staticmethod
     def _unknown(host: str, label: str, value: str, known: list[str]) -> CatalogError:
@@ -174,12 +179,13 @@ class Catalog:
 
     def toc(self, host: str, map_id: str) -> TocPage:
         key = (self._check_host(host), map_id)
-        cached = self._tocs.get(key)
-        if cached and self._fresh(cached[0]):
-            return cached[1]
-        root = parse_toc(self.client(host).get_pages(map_id))
-        self._tocs[key] = (self._clock(), root)
-        return root
+        with self._lock:
+            cached = self._tocs.get(key)
+            if cached and self._fresh(cached[0]):
+                return cached[1]
+            root = parse_toc(self.client(host).get_pages(map_id))
+            self._tocs[key] = (self._clock(), root)
+            return root
 
     def resolve(self, url: str) -> Resolved:
         failure = CatalogError(

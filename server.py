@@ -1,6 +1,7 @@
 """MCP server exposing Fluid Topics documentation tools (stdio)."""
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -17,7 +18,6 @@ DEFAULT_HOSTS = ("docs.tia.siemens.cloud", "docs.industrial-operations-x.siemens
 DEFAULT_LOCALE = "en-US"
 DEFAULT_MIN_INTERVAL = 0.3
 
-_HOSTS_DOC = "Allowed hosts: docs.tia.siemens.cloud (default), docs.industrial-operations-x.siemens.cloud."
 _URL_DOC = "Reader URLs from any search result, TOC line or page link are valid input."
 _FILTER_DOC = (
     "`product` (e.g. 'STEP 7', 'WinCC Unified', 'SIMATIC AX') and `version` (e.g. 'V21', '6.1') "
@@ -40,7 +40,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         interval = float(raw)
     except ValueError:
         raise ValueError(f"SIEMENS_DOCS_MIN_INTERVAL must be a number, got {raw!r}") from None
-    if not interval >= 0:  # also rejects NaN
+    if not (math.isfinite(interval) and interval >= 0):
         raise ValueError(f"SIEMENS_DOCS_MIN_INTERVAL must be >= 0, got {raw!r}")
     return Settings(hosts, env.get("SIEMENS_DOCS_LOCALE", DEFAULT_LOCALE), interval)
 
@@ -55,12 +55,13 @@ def _tool_errors() -> Iterator[None]:
 
 
 def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
+    hosts_doc = f"Allowed hosts: {', '.join(settings.hosts)} (default: {settings.hosts[0]})."
     server = MCPServer("siemens-docs-mcp")
 
     @server.tool(description=(
         f"""Full-text search of Siemens documentation. Returns a numbered Markdown list (1-50 hits via `limit`):
         title, publication + version, breadcrumb, excerpt and reader URL, with the total hit count.
-        Pass a result's reader URL to read_page or get_toc. {_FILTER_DOC} {_HOSTS_DOC}"""
+        Pass a result's reader URL to read_page or get_toc. {_FILTER_DOC} {hosts_doc}"""
     ))
     def search_docs(
         query: str,
@@ -78,7 +79,7 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
     @server.tool(description=(
         f"""Read one documentation page as Markdown, with a header (publication, version, breadcrumb, source URL).
         If the page is longer than `max_chars`, the end says how to continue with a larger `offset`.
-        {_URL_DOC} {_HOSTS_DOC}"""
+        {_URL_DOC} {hosts_doc}"""
     ))
     def read_page(url: str, offset: int = 0, max_chars: int = 20000) -> str:
         with _tool_errors():
@@ -87,7 +88,7 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
     @server.tool(description=(
         f"""Show the table of contents (1-6 levels via `depth`) of the publication, or of the subtree under the
         topic, in `url`: an indented outline, one line per node with title and reader URL.
-        {_URL_DOC} {_HOSTS_DOC}"""
+        {_URL_DOC} {hosts_doc}"""
     ))
     def get_toc(url: str, depth: int = 2) -> str:
         with _tool_errors():
@@ -96,7 +97,7 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
     @server.tool(description=(
         f"""List documentation publications (up to 50 rows): title, product, version, locale and reader URL.
         Use it to discover valid `product` and `version` values; reader URLs are valid input to read_page and
-        get_toc. {_FILTER_DOC} {_HOSTS_DOC}"""
+        get_toc. {_FILTER_DOC} {hosts_doc}"""
     ))
     def list_publications(
         host: str | None = None,
