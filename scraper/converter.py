@@ -19,11 +19,9 @@ from __future__ import annotations
 
 import html as html_module
 import re
-from typing import List
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
-
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -202,7 +200,7 @@ def _render_block(tag: Tag) -> str:
 
 def _render_list(tag: Tag, level: int) -> str:
     ordered = tag.name.lower() == "ol"
-    lines: List[str] = []
+    lines: list[str] = []
     index = 1
 
     for li in tag.find_all("li", recursive=False):
@@ -211,8 +209,8 @@ def _render_list(tag: Tag, level: int) -> str:
         prefix = "  " * level + bullet + " "
         continuation = "  " * (level + 1)
 
-        texts: List[str] = []
-        nested: List[str] = []
+        texts: list[str] = []
+        nested: list[str] = []
 
         for child in li.children:
             if isinstance(child, NavigableString):
@@ -269,7 +267,7 @@ def _render_safety_table(table: Tag) -> str:
 
 def _render_regular_table(table: Tag) -> str:
     """Render a standard HTML table as a GFM Markdown table."""
-    rows: List[List[str]] = []
+    rows: list[list[str]] = []
     for tr in table.find_all("tr"):
         cells = tr.find_all(["th", "td"], recursive=False)
         if not cells:
@@ -309,7 +307,7 @@ def _render_regular_table(table: Tag) -> str:
 
 def _render_div(div: Tag) -> str:
     """Render a <div> by visiting its block-level children."""
-    pieces: List[str] = []
+    pieces: list[str] = []
     for child in div.children:
         if not isinstance(child, Tag):
             continue
@@ -318,7 +316,7 @@ def _render_div(div: Tag) -> str:
             pieces.append(rendered)
 
     # Remove adjacent duplicates (wrapper divs sometimes duplicate content)
-    result: List[str] = []
+    result: list[str] = []
     for piece in pieces:
         if not result or result[-1] != piece:
             result.append(piece)

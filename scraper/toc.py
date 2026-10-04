@@ -8,8 +8,8 @@ Both are handled transparently by ``_parse_node``.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 
 @dataclass
@@ -31,7 +31,7 @@ class TocPage:
     depth: int
     """Nesting depth. 0 = root document, 1 = top-level chapter, etc."""
 
-    children: list["TocPage"] = field(default_factory=list)
+    children: list[TocPage] = field(default_factory=list)
 
     segments: tuple[str, ...] = ()
     """URL path segments relative to the root page, one per TOC level.

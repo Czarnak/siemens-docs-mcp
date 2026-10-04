@@ -6,14 +6,13 @@ import html
 import mimetypes
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 
 TITLE_BODY_RE = re.compile(
     r'<td class="title">(.*?)</td>.*?<div id="nstext">(.*?)</div><br><hr>',
-    re.S,
+    re.DOTALL,
 )
 
 
@@ -34,12 +33,12 @@ class AssetManager:
         self.output_md = output_md
         self.asset_dir = output_md.with_name(f"{output_md.stem}_assets")
         self.image_index = 0
-        self.saved: Dict[str, str] = {}
+        self.saved: dict[str, str] = {}
 
     def save_data_uri(self, data_uri: str) -> str:
         if data_uri in self.saved:
             return self.saved[data_uri]
-        match = re.match(r"data:(image/[^;]+);base64,(.*)", data_uri, re.S)
+        match = re.match(r"data:(image/[^;]+);base64,(.*)", data_uri, re.DOTALL)
         if not match:
             return data_uri
         mime_type, payload = match.groups()
@@ -95,7 +94,7 @@ def inline_to_md(node: Tag | NavigableString, assets: AssetManager) -> str:
 
 def render_list(tag: Tag, assets: AssetManager, level: int = 0) -> str:
     ordered = tag.name.lower() == "ol"
-    lines: List[str] = []
+    lines: list[str] = []
     index = 1
     for li in tag.find_all("li", recursive=False):
         bullet = f"{index}." if ordered else "-"
@@ -103,8 +102,8 @@ def render_list(tag: Tag, assets: AssetManager, level: int = 0) -> str:
         prefix = "  " * level + bullet + " "
         cont = "  " * (level + 1)
 
-        texts: List[str] = []
-        nested: List[str] = []
+        texts: list[str] = []
+        nested: list[str] = []
         for child in li.children:
             if isinstance(child, NavigableString):
                 text = clean_text(str(child))
@@ -151,7 +150,7 @@ def render_safety_table(table: Tag) -> str:
 
 
 def render_regular_table(table: Tag, assets: AssetManager) -> str:
-    rows: List[List[str]] = []
+    rows: list[list[str]] = []
     for tr in table.find_all("tr"):
         cells = tr.find_all(["th", "td"], recursive=False)
         if not cells:
@@ -174,7 +173,7 @@ def render_regular_table(table: Tag, assets: AssetManager) -> str:
 
 
 def render_div(div: Tag, assets: AssetManager) -> str:
-    pieces: List[str] = []
+    pieces: list[str] = []
     for child in div.children:
         if not isinstance(child, Tag):
             continue
@@ -184,7 +183,7 @@ def render_div(div: Tag, assets: AssetManager) -> str:
             if rendered:
                 pieces.append(rendered)
     # Remove adjacent duplicates caused by wrapper duplication.
-    result: List[str] = []
+    result: list[str] = []
     for p in pieces:
         if not result or result[-1] != p:
             result.append(p)
@@ -228,12 +227,12 @@ def render_block(tag: Tag, assets: AssetManager) -> str:
     return ""
 
 
-def extract_sections(source_html: str) -> List[Tuple[str, str]]:
-    sections: List[Tuple[str, str]] = []
-    seen: set[Tuple[str, str]] = set()
+def extract_sections(source_html: str) -> list[tuple[str, str]]:
+    sections: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
     for raw_title, raw_body in TITLE_BODY_RE.findall(source_html):
-        title = clean_text(re.sub(r"<.*?>", " ", raw_title, flags=re.S))
-        preview = clean_text(re.sub(r"<.*?>", " ", raw_body, flags=re.S))[:500]
+        title = clean_text(re.sub(r"<.*?>", " ", raw_title, flags=re.DOTALL))
+        preview = clean_text(re.sub(r"<.*?>", " ", raw_body, flags=re.DOTALL))[:500]
         key = (title, preview)
         if title and key not in seen:
             seen.add(key)
@@ -243,7 +242,7 @@ def extract_sections(source_html: str) -> List[Tuple[str, str]]:
 
 def section_to_markdown(title: str, raw_body: str, assets: AssetManager, anchor: str) -> str:
     soup = BeautifulSoup(raw_body, "html.parser")
-    blocks: List[str] = [f'<a id="{anchor}"></a>', f"# {title}"]
+    blocks: list[str] = [f'<a id="{anchor}"></a>', f"# {title}"]
     for child in soup.contents:
         if isinstance(child, Tag):
             rendered = render_block(child, assets)
@@ -259,15 +258,15 @@ def convert_html_to_markdown(input_html: Path, output_md: Path) -> None:
     sections = extract_sections(source)
     assets = AssetManager(output_md)
 
-    slug_counts: Dict[str, int] = {}
-    section_info: List[Tuple[str, str, str]] = []
+    slug_counts: dict[str, int] = {}
+    section_info: list[tuple[str, str, str]] = []
     for title, body in sections:
         base = make_slug(title)
         slug_counts[base] = slug_counts.get(base, 0) + 1
         slug = base if slug_counts[base] == 1 else f"{base}-{slug_counts[base]}"
         section_info.append((title, body, slug))
 
-    out: List[str] = []
+    out: list[str] = []
     out.append(f"# Converted from {input_html.name}")
     out.append("")
     out.append(

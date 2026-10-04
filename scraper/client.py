@@ -7,6 +7,7 @@ automatically on first use and then reuses it for all subsequent requests.
 from __future__ import annotations
 
 import logging
+from typing import Self
 
 import httpx
 
@@ -115,7 +116,7 @@ class FluidtopicsClient:
     # Context manager
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "FluidtopicsClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:
