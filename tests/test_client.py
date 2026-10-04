@@ -136,3 +136,14 @@ def test_network_error_wrapped():
         client.list_maps()
     assert e.value.status is None
     assert "docs.example.com" in str(e.value)
+
+
+def test_non_transport_http_error_wrapped():
+    def handler(r):
+        raise httpx.TooManyRedirects("too many redirects", request=r)
+
+    client, _ = make(handler)
+    with pytest.raises(FluidtopicsError) as e:
+        client.list_maps()
+    assert e.value.status is None
+    assert "docs.example.com" in str(e.value)

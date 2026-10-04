@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import difflib
 import logging
+import re
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from scraper.client import FluidtopicsClient
 from scraper.toc import TocPage, iter_pages, parse_toc
@@ -18,6 +20,7 @@ log = logging.getLogger(__name__)
 TIA_VERSION_KEY = "tia:SoftwareVersionFilter"
 SW_VERSION_KEY = "SoftwareVersion"
 _VERSION_KEYS = (TIA_VERSION_KEY, SW_VERSION_KEY)
+_CONTENT_ID = re.compile(r"[\w~.-]+")
 
 
 class CatalogError(ValueError):
@@ -90,6 +93,8 @@ class Catalog:
         # Raw version values per host per map id per key, for filter().
         self._map_versions: dict[str, dict[str, dict[str, str]]] = {}
         self._tocs: dict[tuple[str, str], tuple[float, TocPage]] = {}
+        # Lower-cased pretty URLs carried by more than one map per host (ambiguous as reader URLs).
+        self._shared: dict[str, set[str]] = {}
 
     def _check_host(self, host: str) -> str:
         host = host.lower()
@@ -128,6 +133,8 @@ class Catalog:
                             versions[key].append(v)
             self._versions[host] = versions
             self._map_versions[host] = per_map
+            counts = Counter(m.pretty_url.lower() for m in infos.values() if m.pretty_url)
+            self._shared[host] = {p for p, n in counts.items() if n > 1}
             self._maps[host] = (self._clock(), infos)
             return infos
 
@@ -193,35 +200,55 @@ class Catalog:
         )
         parts = urlsplit(url.strip())
         host = self._check_host(parts.hostname or "")
-        path = parts.path.rstrip("/")
+        path = unquote(parts.path).rstrip("/")
         if not path.startswith("/r/"):
             raise failure
         rel = path[3:]
         segs = rel.split("/")
         maps = self.maps(host)
         if segs[0] in maps:
-            return Resolved(host, segs[0], segs[1] if len(segs) > 1 else None)
+            if len(segs) == 1:
+                return Resolved(host, segs[0], None)
+            if not _CONTENT_ID.fullmatch(segs[1]) or segs[1] in (".", ".."):
+                raise failure
+            return Resolved(host, segs[0], segs[1])
         low = rel.lower()
-        matches = [
-            m for m in maps.values()
-            if m.pretty_url
-            and (low == m.pretty_url.lower() or (low + "/").startswith(m.pretty_url.lower() + "/"))
-        ]
-        if not matches:
-            raise failure
-        best = max(matches, key=lambda m: len(m.pretty_url))
-        if low == best.pretty_url.lower():
-            return Resolved(host, best.id, None)
+        # Several maps can share a pretty URL, and a longer prefix may lack the topic: try every
+        # matching map, longest prefix first (stable on ties), until one's TOC holds the topic.
+        matches = sorted(
+            (
+                m for m in maps.values()
+                if m.pretty_url
+                and (low == m.pretty_url.lower() or (low + "/").startswith(m.pretty_url.lower() + "/"))
+            ),
+            key=lambda m: len(m.pretty_url),
+            reverse=True,
+        )
         target = "/r/" + low
-        for page in iter_pages(self.toc(host, best.id)):
-            if page.pretty_url.lower() == target:
-                return Resolved(host, best.id, page.content_id)
+        for m in matches:
+            if low == m.pretty_url.lower():
+                return Resolved(host, m.id, None)
+            for page in iter_pages(self.toc(host, m.id)):
+                if page.pretty_url.lower() == target:
+                    return Resolved(host, m.id, page.content_id)
         raise failure
 
+    def _pretty_ok(self, host: str, map_id: str) -> str:
+        """The map's pretty URL if it identifies the map unambiguously, else ""."""
+        info = self.maps(host).get(map_id)
+        if not info or not info.pretty_url or info.pretty_url.lower() in self._shared[host.lower()]:
+            return ""
+        return info.pretty_url
+
+    def map_url(self, host: str, map_id: str) -> str:
+        """Reader URL of a publication: its pretty URL, or the id form when missing or shared."""
+        host = self._check_host(host)
+        return f"https://{host}/r/{self._pretty_ok(host, map_id) or map_id}"
+
     def reader_url(self, host: str, map_id: str, page: TocPage) -> str:
+        host = self._check_host(host)
         if not page.content_id:  # synthetic root of a multi-section TOC = the publication itself
-            info = self.maps(host).get(map_id)
-            return f"https://{host}/r/{info.pretty_url if info and info.pretty_url else map_id}"
-        if page.pretty_url:
+            return self.map_url(host, map_id)
+        if page.pretty_url and self._pretty_ok(host, map_id):
             return f"https://{host}{page.pretty_url}"
         return f"https://{host}/r/{map_id}/{page.content_id}"

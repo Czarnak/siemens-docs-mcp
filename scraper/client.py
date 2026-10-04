@@ -93,7 +93,7 @@ class FluidtopicsClient:
     # ------------------------------------------------------------------
 
     def _send(self, method: str, path: str, **kw: object) -> httpx.Response:
-        """Throttled single request; transport failures become FluidtopicsError."""
+        """Throttled single request; httpx failures (transport, redirects, decoding) become FluidtopicsError."""
         with self._lock:
             wait = self._last + self._min_interval - self._clock()
             if wait > 0:
@@ -102,7 +102,7 @@ class FluidtopicsClient:
         log.debug("%s %s%s", method, self._base, path)
         try:
             return self._http.request(method, f"{self._base}{path}", **kw)
-        except httpx.TransportError as exc:
+        except httpx.HTTPError as exc:
             raise FluidtopicsError(None, f"network error contacting {self._host}: {exc}") from exc
 
     def _ensure_session(self) -> None:

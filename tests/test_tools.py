@@ -4,6 +4,7 @@ from scraper.catalog import CatalogError, Resolved
 from scraper.tools import get_toc, list_publications, read_page, search_docs
 from tests.conftest import (
     IOX_HOST,
+    SHARED_PRETTY,
     TIA_HOST,
     make_big_toc,
     make_hit,
@@ -79,6 +80,21 @@ def test_list_publications_filters_and_cap(catalog, fake_tia):
 def test_list_publications_small_has_no_footer(catalog):
     out = list_publications(catalog, TIA_HOST, "en-US", version="v20")
     assert out == f"- **STEP 7 Basic V20** — STEP 7 V20 [en-US] https://{TIA_HOST}/r/en-us/v20/doc"
+
+
+def test_list_publications_url_forms(catalog, fake_tia, shared_pretty):
+    fake_tia.maps.append(make_map("tia8", "No Pretty", pretty=""))
+    out = list_publications(catalog, TIA_HOST.upper(), "en-US", version="V21")
+    urls = [line.rsplit(" ", 1)[-1] for line in out.splitlines()]
+    assert f"https://{TIA_HOST}/r/tia8" in urls
+    assert f"https://{TIA_HOST}/r/tia6" in urls and f"https://{TIA_HOST}/r/tia7" in urls
+    assert f"https://{TIA_HOST}/r/en-us/v21/doc" in urls
+    assert all(u.startswith(f"https://{TIA_HOST}/r/") and not u.endswith("/r/") for u in urls)
+
+
+def test_get_toc_topic_from_second_shared_map(catalog, shared_pretty):
+    out = get_toc(catalog, f"https://{TIA_HOST}/r/{SHARED_PRETTY}/b-topic")
+    assert out == f"- B-Topic — https://{TIA_HOST}/r/tia7/tia7-p1"
 
 
 def test_list_publications_none(catalog):

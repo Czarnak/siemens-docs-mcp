@@ -75,4 +75,6 @@ def _sanitize(segment: str) -> str:
     cleaned = _UNSAFE.sub("_", segment)
     # Collapse multiple underscores that may result from substitution
     cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    if cleaned and not cleaned.strip("."):  # ".", ".." would escape output_dir (or vanish on Windows)
+        return "_"
     return cleaned or "_empty_"

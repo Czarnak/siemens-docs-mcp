@@ -57,3 +57,24 @@ async def test_descriptions_list_configured_hosts(catalog):
     async with Client(build_server(catalog, settings)) as client:
         tools = (await client.list_tools()).tools
     assert all("docs.example.com" in (t.description or "") for t in tools)
+
+
+@pytest.mark.anyio
+async def test_unexpected_error_names_exception_type(server):
+    """tia1 has no TOC in the fake, so get_pages raises a bare KeyError (stand-in for API shape drift)."""
+    async with Client(server) as client:
+        result = await client.call_tool("get_toc", {"url": "https://docs.tia.siemens.cloud/r/tia1"})
+    assert result.is_error
+    assert "KeyError" in result.content[0].text
+
+
+@pytest.mark.anyio
+async def test_empty_string_optional_params_are_ignored(server, fake_tia):
+    empty = {"host": "", "product": "", "version": "", "locale": ""}
+    async with Client(server) as client:
+        pubs = await client.call_tool("list_publications", {**empty, "title_contains": ""})
+        hits = await client.call_tool("search_docs", {"query": "x", **empty})
+    assert not pubs.is_error, pubs.content[0].text
+    assert "STEP 7 Basic" in pubs.content[0].text
+    assert not hits.is_error, hits.content[0].text
+    assert fake_tia.search_calls[0]["locale"] == "en-US"

@@ -81,11 +81,14 @@ def list_publications(
 ) -> str:
     """List publications on one host matching the filters (capped at 50 rows)."""
     locale = catalog.canonical(host, "locale", locale)
-    maps = catalog.filter(host, product=product, version=version, locale=locale, title_contains=title_contains)
+    # LLM clients send "" for unset optional params; treat it as "no filter" like search_docs does.
+    maps = catalog.filter(
+        host, product=product or None, version=version or None, locale=locale, title_contains=title_contains or None
+    )
     if not maps:
         return f"No publications match these filters on {host}."
     rows = [
-        f"- **{m.title}** — {m.product} {m.version} [{m.locale}] https://{host}/r/{m.pretty_url}"
+        f"- **{m.title}** — {m.product} {m.version} [{m.locale}] {catalog.map_url(host, m.id)}"
         for m in maps[:MAX_PUBLICATIONS]
     ]
     if len(maps) > MAX_PUBLICATIONS:

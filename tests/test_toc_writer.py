@@ -39,3 +39,11 @@ def test_multi_entry_toc_gets_synthetic_root() -> None:
     assert toc.content_id == "" and toc.pretty_url == BASE
     assert [(p.title, p.depth) for p in iter_pages(toc)] == [("", 0), ("A", 1), ("A1", 2), ("B", 1)]
     assert [p.segments for p in iter_pages(toc)][1:] == [("a",), ("a", "a1"), ("b",)]
+
+
+def test_dot_segments_stay_inside_output_dir() -> None:
+    root = _node("Doc", "")
+    root["pageToc"] = [_node("Up", "/..", [_node("Escape", "/../x")]), _node("Here", "/.")]
+    pages = list(iter_pages(parse_toc({"paginatedToc": [root]})))
+    rel = [p.relative_to("out").as_posix() for p in resolve_output_paths(pages, Path("out"))]
+    assert rel == ["index.md", "_.md", "_/x.md", "_-2.md"], rel

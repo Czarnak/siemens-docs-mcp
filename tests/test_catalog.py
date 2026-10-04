@@ -1,8 +1,17 @@
+from urllib.parse import quote
+
 import pytest
 
 from scraper.catalog import Catalog, CatalogError, MapInfo, Resolved
 from scraper.toc import find_path, parse_toc
-from tests.conftest import IOX_HOST, TIA_HOST, make_map, make_node, make_toc
+from tests.conftest import (
+    IOX_HOST,
+    SHARED_PRETTY,
+    TIA_HOST,
+    make_map,
+    make_node,
+    make_toc,
+)
 
 TIA_DOC = f"https://{TIA_HOST}/r/en-us/v21/doc"
 
@@ -102,6 +111,47 @@ def test_resolve_unknown_path(catalog, path):
     with pytest.raises(CatalogError) as e:
         catalog.resolve(f"https://{TIA_HOST}{path}")
     assert "search_docs" in str(e.value) and "list_publications" in str(e.value)
+
+
+def test_resolve_shared_pretty_url_walks_all_candidates(catalog, shared_pretty):
+    base = f"https://{TIA_HOST}/r/{SHARED_PRETTY}"
+    assert catalog.resolve(f"{base}/b-topic") == Resolved(TIA_HOST, "tia7", "tia7-p1")
+    assert catalog.resolve(f"{base}/a-topic") == Resolved(TIA_HOST, "tia6", "tia6-p1")
+    assert catalog.resolve(base) == Resolved(TIA_HOST, "tia6", None)
+
+
+def test_resolve_falls_back_to_shorter_prefix(catalog, fake_tia):
+    """A longer-prefix map whose TOC lacks the topic must not hide the shorter-prefix map that has it."""
+    fake_tia.maps.append(make_map("tia9", "Chapter Map", pretty="en-us/v21/doc/chapter-1"))
+    fake_tia.pages["tia9"] = make_toc("tia9-root", "Chapter Map", "/r/en-us/v21/doc/chapter-1")
+    assert catalog.resolve(f"{TIA_DOC}/chapter-1/page-1") == Resolved(TIA_HOST, "tia2", "tia2-p1")
+
+
+def test_reader_url_shared_pretty_uses_id_form(catalog, shared_pretty):
+    for map_id in ("tia6", "tia7"):
+        root = catalog.toc(TIA_HOST, map_id)
+        assert catalog.reader_url(TIA_HOST, map_id, root) == f"https://{TIA_HOST}/r/{map_id}/{map_id}-root"
+        child = root.children[0]
+        assert catalog.reader_url(TIA_HOST, map_id, child) == f"https://{TIA_HOST}/r/{map_id}/{map_id}-p1"
+        assert catalog.map_url(TIA_HOST, map_id) == f"https://{TIA_HOST}/r/{map_id}"
+    assert catalog.map_url(TIA_HOST.upper(), "tia2") == f"https://{TIA_HOST}/r/en-us/v21/doc"
+
+
+def test_map_url_without_pretty_uses_id(catalog, fake_tia):
+    fake_tia.maps.append(make_map("tia8", "No Pretty", pretty=""))
+    assert catalog.map_url(TIA_HOST, "tia8") == f"https://{TIA_HOST}/r/tia8"
+
+
+def test_resolve_percent_encoded_unicode(catalog, fake_tia):
+    fake_tia.maps.append(make_map("tia-zh", "门户", locale="zh-CN", pretty="zh-cn/v21/门户"))
+    url = f"https://{TIA_HOST}/r/zh-cn/v21/{quote('门户')}"
+    assert catalog.resolve(url) == Resolved(TIA_HOST, "tia-zh", None)
+
+
+@pytest.mark.parametrize("content", ["..", ".", "..%2F..%2Fx", "x%3Fy", "a b"])
+def test_resolve_rejects_unsafe_content_id(catalog, content):
+    with pytest.raises(CatalogError, match="Could not resolve"):
+        catalog.resolve(f"https://{TIA_HOST}/r/tia2/{content}")
 
 
 def test_resolve_unknown_host(catalog):

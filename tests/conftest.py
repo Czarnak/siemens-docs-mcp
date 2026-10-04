@@ -130,6 +130,21 @@ def fake_tia() -> FakeClient:
     return client
 
 
+SHARED_PRETTY = "en-us/v21/shared"
+
+
+@pytest.fixture
+def shared_pretty(fake_tia: FakeClient) -> FakeClient:
+    """Adds tia6/tia7: two distinct maps sharing one ft:prettyUrl, each with its own TOC (live: TOOpenness)."""
+    for map_id, title, topic in (("tia6", "Shared A", "a-topic"), ("tia7", "Shared B", "b-topic")):
+        fake_tia.maps.append(make_map(map_id, title, pretty=SHARED_PRETTY))
+        fake_tia.pages[map_id] = make_toc(
+            f"{map_id}-root", title, f"/r/{SHARED_PRETTY}",
+            [make_node(f"t-{map_id}", f"{map_id}-p1", topic.title(), f"/r/{SHARED_PRETTY}/{topic}")],
+        )
+    return fake_tia
+
+
 @pytest.fixture
 def fake_iox() -> FakeClient:
     client = FakeClient(

@@ -85,11 +85,6 @@ def find_path(root: TocPage, content_id: str) -> list[TocPage] | None:
     return None
 
 
-def count_pages(root: TocPage) -> int:
-    """Count the total number of pages in the tree."""
-    return sum(1 for _ in iter_pages(root))
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------

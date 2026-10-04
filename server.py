@@ -1,6 +1,7 @@
 """MCP server exposing Fluid Topics documentation tools (stdio)."""
 from __future__ import annotations
 
+import logging
 import math
 import os
 from collections.abc import Iterator, Mapping
@@ -13,6 +14,8 @@ from mcp.server.mcpserver.exceptions import ToolError
 from scraper import tools
 from scraper.catalog import Catalog, CatalogError
 from scraper.client import FluidtopicsClient, FluidtopicsError
+
+log = logging.getLogger(__name__)
 
 DEFAULT_HOSTS = ("docs.tia.siemens.cloud", "docs.industrial-operations-x.siemens.cloud")
 DEFAULT_LOCALE = "en-US"
@@ -52,6 +55,9 @@ def _tool_errors() -> Iterator[None]:
         yield
     except (CatalogError, FluidtopicsError, ValueError) as exc:
         raise ToolError(str(exc)) from None
+    except Exception as exc:  # API shape drift etc.: name the failure instead of a bare "Error executing tool"
+        log.exception("Unexpected tool failure")
+        raise ToolError(f"Unexpected error ({type(exc).__name__}): {exc}") from None
 
 
 def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
