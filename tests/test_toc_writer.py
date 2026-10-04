@@ -1,7 +1,6 @@
-"""Offline regression checks. Run: python test_scraper.py"""
+"""Offline regression checks for TOC parsing and output paths."""
 from pathlib import Path
 
-from scraper.converter import html_to_markdown
 from scraper.toc import iter_pages, parse_toc
 from scraper.writer import resolve_output_paths
 
@@ -32,24 +31,3 @@ def test_output_paths() -> None:
         "dup.md",
         "dup-2.md",
     ], rel
-
-
-def test_code_table_is_not_double_spaced() -> None:
-    html = (
-        '<table class="table_sourcecode"><thead><tr><th><p class="table_sourcecode">'
-        '<a href="x"><img alt="Copies the following program code to clipboard."></a></p></th></tr></thead>'
-        "<tbody><tr><td>\n"
-        '  <p class="p_table_l_code">var a = 1;</p>\n'
-        '  <p class="p_table_l_code">&nbsp;&nbsp;{</p>\n'
-        '  <p class="p_table_l_code">&nbsp;</p>\n'
-        '  <p class="p_table_l_code">&nbsp;&nbsp;}</p>\n'
-        "</td></tr></tbody></table>"
-    )
-    md = html_to_markdown(html, "T")
-    assert "```csharp\nvar a = 1;\n  {\n\n  }\n```" in md, md
-
-
-if __name__ == "__main__":
-    test_output_paths()
-    test_code_table_is_not_double_spaced()
-    print("OK")

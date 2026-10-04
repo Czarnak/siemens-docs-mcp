@@ -26,7 +26,9 @@ git clone https://github.com/your-org/docs-scraper.git
 cd docs-scraper
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
+# development (pytest, ruff, pip-audit; needs pip >= 25.1):
+pip install -e . --group dev
 ```
 
 Requires Python 3.11+.
