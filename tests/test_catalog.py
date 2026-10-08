@@ -164,12 +164,12 @@ def test_canonical_product_case_insensitive(catalog):
 
 
 def test_canonical_unknown_suggests_close(catalog):
-    with pytest.raises(CatalogError, match="STEP 7"):
+    with pytest.raises(CatalogError, match="Close matches: .*STEP 7"):
         catalog.canonical(TIA_HOST, "product", "STEP7")
 
 
 def test_canonical_unknown_lists_known_when_no_close(catalog):
-    with pytest.raises(CatalogError, match="TIA Portal Openness"):
+    with pytest.raises(CatalogError, match="Valid values include: .*TIA Portal Openness"):
         catalog.canonical(TIA_HOST, "product", "zzzzzz")
 
 

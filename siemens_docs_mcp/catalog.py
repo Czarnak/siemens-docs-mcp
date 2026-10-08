@@ -141,7 +141,8 @@ class Catalog:
     @staticmethod
     def _unknown(host: str, label: str, value: str, known: list[str]) -> CatalogError:
         close = difflib.get_close_matches(value, known, n=5, cutoff=0.5)
-        return CatalogError(f"Unknown {label} {value!r} on {host}. Close matches: {close or known[:10]}")
+        hint = f"Close matches: {close}" if close else f"Valid values include: {known[:10]}"
+        return CatalogError(f"Unknown {label} {value!r} on {host}. {hint}")
 
     def canonical(self, host: str, field: Literal["product", "locale"], value: str) -> str:
         values = sorted({getattr(m, field) for m in self.maps(host).values()} - {""})

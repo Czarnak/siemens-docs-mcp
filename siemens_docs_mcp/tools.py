@@ -35,7 +35,8 @@ def _hit_version(topic: dict) -> str:
 def _format_hit(index: int, topic: dict) -> str:
     version = _hit_version(topic)
     suffix = f" ({version})" if version else ""
-    excerpt = BeautifulSoup(topic.get("htmlExcerpt") or "", "html.parser").get_text(" ", strip=True)
+    # Highlight spans carry their own spacing; a get_text separator would split "on-delay" into "on - delay".
+    excerpt = " ".join(BeautifulSoup(topic.get("htmlExcerpt") or "", "html.parser").get_text().split())
     return (
         f"{index}. **{topic.get('title', '')}** — {topic.get('mapTitle', '')}{suffix}\n"
         f"   {' > '.join(topic.get('breadcrumb') or [])}\n"

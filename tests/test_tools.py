@@ -41,6 +41,17 @@ def test_search_docs_omits_version_when_missing(catalog, fake_tia):
     assert "**Hit** — STEP 7 Basic\n" in out
 
 
+def test_search_docs_excerpt_keeps_original_spacing(catalog, fake_tia):
+    excerpt = (
+        '<span class="kwicmatch">TON</span><span class="kwicstring">: </span>'
+        '<span class="kwicmatch">Start on</span><span class="kwicstring">-</span>'
+        '<span class="kwicmatch">delay timer</span><span class="kwicstring">&quot; instruction</span>'
+    )
+    fake_tia.search_response = make_search_response([make_hit(excerpt=excerpt)])
+    out = search_docs(catalog, "q", TIA_HOST, "en-US")
+    assert '   TON: Start on-delay timer" instruction\n' in out
+
+
 def test_search_docs_canonicalizes_filters(catalog, fake_tia):
     fake_tia.search_response = make_search_response([make_hit()])
     search_docs(catalog, "q", TIA_HOST, "en-US", product="step 7", version="v21")

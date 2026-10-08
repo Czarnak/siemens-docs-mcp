@@ -38,6 +38,18 @@ def test_iox_fixture_admonition_rendered() -> None:
     assert "> **" in md
 
 
+def test_list_item_keeps_inline_markup() -> None:
+    html = (
+        '<ul><li><a href="https://h/access?ft:baseId=1">LAD (S7-1200)</a></li>'
+        "<li>Use <b>TON</b> or <code>IEC_TIMER</code> here</li>"
+        "<li><p>First para</p><p>Second <b>para</b></p></li></ul>"
+    )
+    md = html_to_markdown(html, "T")
+    assert "- [LAD (S7-1200)](https://h/access?ft:baseId=1)\n" in md, md
+    assert "- Use **TON** or `IEC_TIMER` here\n" in md, md
+    assert "- First para\n\n  Second **para**" in md, md
+
+
 def test_unknown_inline_only_tag_not_dropped() -> None:
     md = html_to_markdown("<dl><dt>Term</dt><dd>Definition</dd></dl><pre>x = 1\ny = 2</pre>", "T")
     assert "Term" in md and "Definition" in md

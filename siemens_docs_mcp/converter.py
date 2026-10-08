@@ -211,6 +211,17 @@ def _render_block(tag: Tag) -> str:
 # List rendering
 # ---------------------------------------------------------------------------
 
+_INLINE_TAGS = {"a", "b", "strong", "i", "em", "code", "span", "img", "sub", "sup", "u", "br"}
+
+
+def _flush_run(run: list[str], texts: list[str]) -> None:
+    """Append the inline ``run`` to ``texts`` as one paragraph, then empty it."""
+    text = _clean_text("".join(run))
+    if text:
+        texts.append(text)
+    run.clear()
+
+
 def _render_list(tag: Tag, level: int) -> str:
     ordered = tag.name.lower() == "ol"
     lines: list[str] = []
@@ -224,15 +235,15 @@ def _render_list(tag: Tag, level: int) -> str:
 
         texts: list[str] = []
         nested: list[str] = []
+        run: list[str] = []  # consecutive inline nodes, joined into one paragraph
 
         for child in li.children:
-            if isinstance(child, NavigableString):
-                text = _clean_text(str(child))
-                if text:
-                    texts.append(text)
+            if isinstance(child, NavigableString) or (isinstance(child, Tag) and child.name.lower() in _INLINE_TAGS):
+                run.append(_inline_to_md(child))
                 continue
             if not isinstance(child, Tag):
                 continue
+            _flush_run(run, texts)
             child_name = child.name.lower()
             if child_name in {"ul", "ol"}:
                 nested.append(_render_list(child, level + 1))
@@ -242,6 +253,7 @@ def _render_list(tag: Tag, level: int) -> str:
                 text = _clean_text("".join(_inline_to_md(c) for c in child.children))
                 if text:
                     texts.append(text)
+        _flush_run(run, texts)
 
         item_text = "\n\n".join(texts).strip()
         if item_text:
