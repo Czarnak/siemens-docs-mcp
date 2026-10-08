@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siemens-docs-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Search and read Siemens Fluid Topics documentation via MCP or export it to Markdown"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,7 +37,12 @@ siemens-docs-mcp = "siemens_docs_mcp.server:main"
 siemens-docs-export = "siemens_docs_mcp.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=9.1.1", "pytest-cov>=7.1.0", "ruff>=0.16.10", "pip-audit>=2.10.1"]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.10",
+    "pip-audit>=2.10.1",
+]
 
 [tool.setuptools]
 packages = ["siemens_docs_mcp"]
