@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siemens-docs-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Search and read Siemens Fluid Topics documentation via MCP or export it to Markdown"
 readme = "README.md"
 requires-python = ">=3.11"
