@@ -179,6 +179,12 @@ def test_read_page_untitled_topic_not_in_toc(catalog, fake_tia):
     assert "# (untitled topic)" in out and "Orphan" in out
 
 
+def test_read_page_follows_in_page_toc_id_link(catalog):
+    out = read_page(catalog, f"https://{TIA_HOST}/r/tia2/t-p1")
+    assert "# Page 1" in out and "Hello" in out
+    assert "> Source: https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1\n" in out
+
+
 def test_read_page_missing_map_is_catalog_error(catalog, fake_tia, monkeypatch):
     monkeypatch.setattr(catalog, "maps", lambda host: {})
     monkeypatch.setattr(

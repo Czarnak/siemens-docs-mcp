@@ -75,8 +75,11 @@ def iter_pages(root: TocPage) -> Iterator[TocPage]:
 
 
 def find_path(root: TocPage, content_id: str) -> list[TocPage] | None:
-    """Return the root-to-node path for ``content_id`` (DFS), or None if absent."""
-    if root.content_id == content_id:
+    """Return the root-to-node path for ``content_id`` (DFS), or None if absent.
+
+    Also matches ``toc_id``: in-page links point at ``/r/{map}/{tocId}``.
+    """
+    if content_id in (root.content_id, root.toc_id):
         return [root]
     for child in root.children:
         sub = find_path(child, content_id)

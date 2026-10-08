@@ -229,6 +229,8 @@ def test_find_path_returns_root_to_node():
     assert [p.content_id for p in find_path(root, "cb")] == ["r", "ca", "cb"]
     assert [p.content_id for p in find_path(root, "r")] == ["r"]
     assert find_path(root, "zzz") is None
+    # In-page links use the tocId (/r/{map}/{tocId}), not the contentId
+    assert [p.content_id for p in find_path(root, "b")] == ["r", "ca", "cb"]
 
 
 def test_concurrent_cold_loads_happen_once(fake_tia, fake_iox):
