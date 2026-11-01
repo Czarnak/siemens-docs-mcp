@@ -1,0 +1,51 @@
+# Path-to-label rules for .github/workflows/pr-labeler.yml (actions/labeler).
+#
+# Each "area: *" rule lists the source modules and the tests that cover them, so a PR that
+# touches either gets the label. Labels are only ever added (sync-labels is off). Because
+# every rule is derived from the changed paths, an added label is always accurate for the
+# current diff.
+
+"area: mcp-server":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "siemens_docs_mcp/server.py"
+          - "siemens_docs_mcp/tools.py"
+          - "tests/test_server.py"
+          - "tests/test_tools.py"
+
+"area: export-cli":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "siemens_docs_mcp/cli.py"
+          - "siemens_docs_mcp/writer.py"
+          - "configs/**"
+          - "tests/test_cli.py"
+          - "tests/test_toc_writer.py"
+
+"area: converter":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "siemens_docs_mcp/converter.py"
+          - "siemens_docs_mcp/content.py"
+          - "html_to_markdown_tia.py"
+          - "tests/test_converter.py"
+          - "tests/fixtures/**"
+
+"area: client":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "siemens_docs_mcp/client.py"
+          - "siemens_docs_mcp/catalog.py"
+          - "siemens_docs_mcp/toc.py"
+          - "tests/test_client.py"
+          - "tests/test_catalog.py"
+
+# Only documentation-only PRs: every changed file must be under docs/ or a Markdown file.
+# Most feature PRs also update docs, so a looser rule would put this label on nearly all PRs.
+documentation:
+  - changed-files:
+      - all-globs-to-all-files: "{docs/**,**/*.md}"
+
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"

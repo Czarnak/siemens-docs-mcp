@@ -1,0 +1,14 @@
+# Groups pull requests in the auto-generated GitHub release notes (gh release create --generate-notes).
+# A PR lands in the first category whose labels it carries; "*" catches everything else.
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Fixed
+      labels: [bug]
+    - title: Documentation
+      labels: [documentation]
+    - title: Maintenance
+      labels: [dependencies, github_actions, "python:uv"]
+    - title: Other changes
+      labels: ['*']
