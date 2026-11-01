@@ -1,0 +1,66 @@
+name: Feature request
+description: Propose a new tool, option, or capability, or an improvement to an existing one.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the open issues first. Describe the problem you want solved, not only the change you have in mind.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not already covered.
+          required: true
+
+  # The Area options map to "area: *" labels in .github/workflows/issue-labeler.yml.
+  # Keep the option text identical in both places, and never put a comma in an option:
+  # GitHub joins multiple selections with ", ", which the workflow splits on.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Pick every area involved. Use the last option for something that fits none of them, such as a new documentation host.
+      multiple: true
+      options:
+        - MCP server and tools
+        - Markdown export CLI
+        - HTML to Markdown conversion
+        - Fluid Topics client and catalog
+        - New capability area
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do with the documentation, and what stops you today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Which tool, parameter, config key, or output change would you add? Sketch the call and the result if you can.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use today, or other designs you ruled out and why.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Example pages or publications, if the request is about specific content.
+    validations:
+      required: false
