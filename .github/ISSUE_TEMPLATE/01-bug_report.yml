@@ -1,0 +1,158 @@
+name: Bug report
+description: The MCP server, the Markdown exporter, or the conversion output does not behave as documented.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. The details below let the problem be reproduced without access to your machine.
+
+        **Security vulnerabilities do not belong here.** Report them privately through a [security advisory](https://github.com/Czarnak/siemens-docs-mcp/security/advisories/new).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I checked the [README](https://github.com/Czarnak/siemens-docs-mcp#readme) for the tool, environment variable, or config key involved.
+          required: true
+        - label: I reproduced it with the latest released version, or I say below why I could not.
+          required: true
+
+  # --- Where it fails ------------------------------------------------------------------
+  # The Area options map to "area: *" labels in .github/workflows/issue-labeler.yml.
+  # Keep the option text identical in both places, and never put a comma in an option:
+  # GitHub joins multiple selections with ", ", which the workflow splits on.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Pick every area involved. Choose "Not sure" if you cannot tell.
+      multiple: true
+      options:
+        - MCP server and tools
+        - Markdown export CLI
+        - HTML to Markdown conversion
+        - Fluid Topics client and catalog
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or command
+      description: The MCP tool that failed, or the CLI invocation.
+      placeholder: read_page, or siemens-docs-export my_docs.yaml --page cybersecurity-information
+    validations:
+      required: false
+
+  - type: input
+    id: url
+    attributes:
+      label: Page, publication, or search query
+      description: The reader URL, publication, or query that triggers the problem. Documentation pages are public, so a URL is the easiest way to reproduce.
+      placeholder: https://docs.tia.siemens.cloud/r/en-us/v21/...
+    validations:
+      required: false
+
+  # --- Environment ---------------------------------------------------------------------
+
+  - type: input
+    id: version
+    attributes:
+      label: siemens-docs-mcp version
+      description: Run `pip show siemens-docs-mcp`, or give the commit if you run from source.
+      placeholder: 0.1.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - uvx siemens-docs-mcp
+        - pip install siemens-docs-mcp
+        - From source (editable install)
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.4"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, Ubuntu 24.04, macOS 15
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: The client that launches the server. Leave empty for exporter problems.
+      placeholder: Claude Code 2.x, Claude Desktop, VS Code
+    validations:
+      required: false
+
+  - type: input
+    id: settings
+    attributes:
+      label: Non-default settings
+      description: Any `SIEMENS_DOCS_*` environment variables you set, or the export config keys that matter. Leave empty if you use the defaults.
+      placeholder: SIEMENS_DOCS_LOCALE=de-DE
+    validations:
+      required: false
+
+  # --- What happened -------------------------------------------------------------------
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Call search_docs with ...
+        2. Call read_page with the first result ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or logs
+      description: Tool output or the exporter's console output. Run the exporter with `--verbose` for DEBUG logs.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+    validations:
+      required: false

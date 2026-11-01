@@ -1,0 +1,13 @@
+# Issue template chooser configuration.
+#
+# Blank issues are disabled so every report arrives through a form with the environment
+# details needed for triage. Vulnerabilities are routed to a private security advisory.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Czarnak/siemens-docs-mcp/security/advisories/new
+    about: Report privately through a security advisory. Never open a public issue for a vulnerability.
+  - name: Usage and configuration
+    url: https://github.com/Czarnak/siemens-docs-mcp#readme
+    about: Setup, environment variables, the MCP tools and the export config format are documented in the README. Check it before filing a bug.
