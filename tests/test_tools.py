@@ -29,7 +29,7 @@ def test_search_docs_formats_hits(catalog, fake_tia):
     assert "1. **Create block** — STEP 7 Basic (V21)" in out
     assert "   Chapter 1 > Section" in out
     assert "   Some text" in out and "<b>" not in out
-    assert "   https://docs.tia.siemens.cloud/r/en-us/v21/doc/page" in out
+    assert "   https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1" in out
     call = fake_tia.search_calls[0]
     assert call["locale"] == "en-US" and call["filters"] is None
     assert call["page"] == 1 and call["per_page"] == 5
@@ -62,7 +62,10 @@ def test_search_docs_canonicalizes_filters(catalog, fake_tia):
 
 
 def test_search_docs_version_filter_key_for_iox(catalog, fake_iox):
-    fake_iox.search_response = make_search_response([make_hit()])
+    fake_iox.search_response = make_search_response([make_hit(
+        map_id="iox1", content_id="iox1-p1", map_title="Edge Guide",
+        reader_url=f"https://{IOX_HOST}/r/en-us/edge/guide/intro",
+    )])
     search_docs(catalog, "q", IOX_HOST, "en-US", version="6.1")
     assert fake_iox.search_calls[0]["filters"] == [{"key": "SoftwareVersion", "values": ["6.1"]}]
 

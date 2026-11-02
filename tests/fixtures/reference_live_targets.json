@@ -1,0 +1,16 @@
+{
+  "targets": [
+    {
+      "host": "docs.tia.siemens.cloud",
+      "query": "TIA Portal Openness",
+      "publication_url": "https://docs.tia.siemens.cloud/r/en-us/v20/tia-portal-openness-api-for-automation-of-engineering-workflows",
+      "topic_url": "https://docs.tia.siemens.cloud/r/en-us/v20/tia-portal-openness-api-for-automation-of-engineering-workflows/basics/installation/installing-tia-portal-openness"
+    },
+    {
+      "host": "docs.industrial-operations-x.siemens.cloud",
+      "query": "OPC UA",
+      "publication_url": "https://docs.industrial-operations-x.siemens.cloud/r/en-us/v2.7/industrial-information-hub",
+      "topic_url": "https://docs.industrial-operations-x.siemens.cloud/r/en-us/v2.7/industrial-information-hub/manage-data/setting-up-opc-ua-models/loading-the-opc-ua-model-via-opc-ua-server"
+    }
+  ]
+}

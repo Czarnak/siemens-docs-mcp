@@ -78,6 +78,7 @@ class FakeClient:
         self.search_calls: list[dict] = []
         self.list_maps_calls = 0
         self.get_pages_calls: list[str] = []
+        self.get_content_calls: list[tuple[str, str]] = []
 
     def list_maps(self) -> list[dict]:
         self.list_maps_calls += 1
@@ -88,6 +89,7 @@ class FakeClient:
         return self.pages[map_id]
 
     def get_content(self, map_id: str, content_id: str) -> str:
+        self.get_content_calls.append((map_id, content_id))
         return self.contents[(map_id, content_id)]
 
     def search(self, query, locale, filters=None, page=1, per_page=10) -> dict:
@@ -127,6 +129,8 @@ def fake_tia() -> FakeClient:
         ],
     )
     client.contents[("tia2", "tia2-p1")] = "<h1>Page 1</h1><p>Hello</p>"
+    client.contents[("tia2", "tia2-root")] = "<h1>STEP 7 Basic</h1><p>Welcome</p>"
+    client.contents[("tia2", "tia2-ch1")] = "<h1>Chapter 1</h1><p>Overview</p>"
     return client
 
 
@@ -170,6 +174,7 @@ def fake_iox() -> FakeClient:
     }
     client.contents[("iox1", "iox1-p1")] = "<h1>Intro</h1>"
     client.contents[("iox1", "iox1-p1a")] = "<h1>Intro A</h1>"
+    client.contents[("iox1", "iox1-p2")] = "<h1>Setup</h1>"
     return client
 
 
@@ -193,8 +198,11 @@ def make_hit(
     map_title: str = "STEP 7 Basic",
     breadcrumb: list[str] | None = None,
     excerpt: str = "<p>Some <b>text</b></p>",
-    reader_url: str = "https://docs.tia.siemens.cloud/r/en-us/v21/doc/page",
+    reader_url: str = "https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1",
     metadata: list[dict] | None = None,
+    *,
+    map_id: str | None = "tia2",
+    content_id: str | None = "tia2-p1",
 ) -> dict:
     """One search cluster whose first entry is a TOPIC."""
     return {
@@ -202,8 +210,8 @@ def make_hit(
             {
                 "type": "TOPIC",
                 "topic": {
-                    "mapId": "tia2",
-                    "contentId": "c1",
+                    **({"mapId": map_id} if map_id is not None else {}),
+                    **({"contentId": content_id} if content_id is not None else {}),
                     "title": title,
                     "mapTitle": map_title,
                     "breadcrumb": breadcrumb if breadcrumb is not None else ["Chapter 1", "Section"],
@@ -226,6 +234,52 @@ def make_big_toc(n: int, content_id: str = "big-root") -> dict:
     """/pages response with ``n`` flat children under the root (n + 1 nodes)."""
     kids = [make_node(f"bt{i}", f"big-p{i}", f"Topic {i}", f"/r/big/t{i}") for i in range(n)]
     return make_toc(content_id, "Big", "/r/big", kids)
+
+
+@pytest.fixture
+def reference_cases(fake_tia: FakeClient, fake_iox: FakeClient) -> dict[str, tuple[str, dict]]:
+    """Eight small, addressable URL-mode baselines shared by later qualification."""
+    for client in (fake_tia, fake_iox):
+        for publication in client.maps:
+            map_id = publication["id"]
+            if map_id not in client.pages:
+                pretty = next(m["values"][0] for m in publication["metadata"] if m["key"] == "ft:prettyUrl")
+                client.pages[map_id] = make_toc(f"{map_id}-root", publication["title"], f"/r/{pretty}")
+                client.contents[(map_id, f"{map_id}-root")] = f"<h1>{publication['title']}</h1><p>Welcome</p>"
+    fake_tia.search_response = make_search_response([
+        make_hit(title="Page 1", breadcrumb=["STEP 7 Basic", "Chapter 1"],
+                 metadata=[{"key": "tia:SoftwareVersionFilter", "values": ["V21"]}]),
+    ], total=42)
+    fake_iox.search_response = make_search_response([
+        make_hit(title="Intro", map_title="Edge Guide", breadcrumb=["Edge Guide"],
+                 reader_url=f"https://{IOX_HOST}/r/en-us/edge/guide/intro",
+                 metadata=[{"key": "SoftwareVersion", "values": ["6.1"]}],
+                 map_id="iox1", content_id="iox1-p1"),
+    ], total=3)
+    cases = {}
+    for prefix, host, publication, topic in (
+        ("tia", TIA_HOST, "en-us/v21/doc", "en-us/v21/doc/chapter-1/page-1"),
+        ("iox", IOX_HOST, "en-us/edge/guide", "en-us/edge/guide/intro"),
+    ):
+        cases[f"{prefix}_search"] = ("search_docs", {"query": "reference", "host": host, "locale": "en-US", "limit": 2})
+        cases[f"{prefix}_list"] = ("list_publications", {"host": host, "locale": "en-US"})
+        cases[f"{prefix}_read"] = ("read_page", {"url": f"https://{host}/r/{topic}"})
+        cases[f"{prefix}_toc"] = ("get_toc", {"url": f"https://{host}/r/{publication}", "depth": 2})
+    return cases
+
+
+@pytest.fixture
+def long_reference_toc(fake_tia: FakeClient) -> tuple[str, list[str]]:
+    """A separate 301-row TOC with long readable paths and stable topic IDs."""
+    pretty = "en-us/v21/long-reference-guide"
+    fake_tia.maps.append(make_map("long-reference", "Long Reference Guide", pretty=pretty))
+    children = [
+        make_node(f"long-toc-{i}", f"long-topic-{i}", f"Long Topic {i}",
+                  f"/r/{pretty}/" + "engineering-automation-reference/" * 5 + f"topic-{i}")
+        for i in range(300)
+    ]
+    fake_tia.pages["long-reference"] = make_toc("long-root", "Long Reference Guide", f"/r/{pretty}", children)
+    return f"https://{TIA_HOST}/r/long-reference", ["long-root"] + [f"long-topic-{i}" for i in range(300)]
 
 
 @pytest.fixture

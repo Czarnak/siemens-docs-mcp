@@ -1,0 +1,34 @@
+{
+  "tia_search": {
+    "output": "Found 42 results for \"reference\" on docs.tia.siemens.cloud. Showing 1:\n1. **Page 1** — STEP 7 Basic (V21)\n   STEP 7 Basic > Chapter 1\n   Some text\n   https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1",
+    "chars": 213
+  },
+  "tia_list": {
+    "output": "- **Openness API** — TIA Portal Openness V21 [en-US] https://docs.tia.siemens.cloud/r/en-us/v21/openness\n- **STEP 7 Basic** — STEP 7 V21 [en-US] https://docs.tia.siemens.cloud/r/en-us/v21/doc\n- **STEP 7 Basic Extra** — STEP 7 V21 [en-US] https://docs.tia.siemens.cloud/r/en-us/v21/doc-extra\n- **STEP 7 Basic V20** — STEP 7 V20 [en-US] https://docs.tia.siemens.cloud/r/en-us/v20/doc",
+    "chars": 381
+  },
+  "tia_read": {
+    "output": "> Publication: STEP 7 Basic (V21) [en-US]\n> Path: STEP 7 Basic > Chapter 1 > Page 1\n> Source: https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1\n\n# Page 1\n\n# Page 1\n\nHello\n",
+    "chars": 185
+  },
+  "tia_toc": {
+    "output": "- STEP 7 Basic — https://docs.tia.siemens.cloud/r/en-us/v21/doc\n  - Chapter 1 — https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1\n    - Page 1 — https://docs.tia.siemens.cloud/r/en-us/v21/doc/chapter-1/page-1",
+    "chars": 215
+  },
+  "iox_search": {
+    "output": "Found 3 results for \"reference\" on docs.industrial-operations-x.siemens.cloud. Showing 1:\n1. **Intro** — Edge Guide (6.1)\n   Edge Guide\n   Some text\n   https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide/intro",
+    "chars": 227
+  },
+  "iox_list": {
+    "output": "- **Edge Admin** — Industrial Edge 6.0 [en-US] https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/admin\n- **Edge Guide** — Industrial Edge 6.1 [en-US] https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide",
+    "chars": 233
+  },
+  "iox_read": {
+    "output": "> Publication: Edge Guide (6.1) [en-US]\n> Path: Edge Guide > Intro\n> Source: https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide/intro\n\n# Intro\n\n# Intro\n",
+    "chars": 171
+  },
+  "iox_toc": {
+    "output": "- Edge Guide — https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide\n  - Intro — https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide/intro\n    - Intro A — https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide/intro/a\n  - Setup — https://docs.industrial-operations-x.siemens.cloud/r/en-us/edge/guide/setup",
+    "chars": 354
+  }
+}
