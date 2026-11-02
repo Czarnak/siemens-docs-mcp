@@ -313,5 +313,5 @@ task-reviewed. The implementer self-reviewed the qualification diff; whole-branc
 independent review of
 `f774c294c77cc84f20ed436a552b991350f11bc3..bb9ef389da1e04ca98aea20c84c7ceb58e4f0c6a`
 found no Critical or Important issues and one minor stale-handoff documentation
-finding, addressed in the plan/evidence correction. This correction still requires
-scoped review. No push, PR, merge, deployment, or release was performed.
+finding, addressed in the plan/evidence correction. This correction passed
+scoped review with no new findings. No push, PR, merge, deployment, or release was performed.

@@ -187,7 +187,7 @@ The [qualification evidence](2026-11-02-compact-references-evidence.md#task-5-ca
 records the exact measurements and the verified TIA publication/root equivalence.
 Whole-branch independent review found no Critical or Important issues and one
 minor stale-handoff documentation finding, addressed in this correction. The
-correction still requires scoped review; no release is authorized.
+correction passed scoped review with no new findings; no release is authorized.
 
 **Files:** Modify `tests/test_reference_sizes.py`, `tests/test_live.py`, `tests/fixtures/reference_outputs.json` only to add budget metadata, and the evidence document. Fill live targets only from actual successful discovery; preserve baseline identities.
 
@@ -203,4 +203,4 @@ correction still requires scoped review; no release is authorized.
 
 ## Handoff and recovery
 
-All five tasks are implemented and independently task-reviewed. Whole-branch independent review of `f774c294c77cc84f20ed436a552b991350f11bc3..bb9ef389da1e04ca98aea20c84c7ceb58e4f0c6a` found no Critical or Important issues and one minor stale-handoff documentation finding, addressed here. This documentation correction still requires scoped review. Stage A's refactor commit can stand independently; stage B is recoverable through explicit URL output and, if necessary, reverting the feature commits in dependency order while retaining the behavior-preserving extraction. Do not reset unrelated work or rewrite published history. No push, PR creation, merge, or release is authorized by this plan.
+All five tasks are implemented and independently task-reviewed. Whole-branch independent review of `f774c294c77cc84f20ed436a552b991350f11bc3..bb9ef389da1e04ca98aea20c84c7ceb58e4f0c6a` found no Critical or Important issues and one minor stale-handoff documentation finding, addressed here. This documentation correction passed scoped review with no new findings. Stage A's refactor commit can stand independently; stage B is recoverable through explicit URL output and, if necessary, reverting the feature commits in dependency order while retaining the behavior-preserving extraction. Do not reset unrelated work or rewrite published history. No push, PR creation, merge, or release is authorized by this plan.
