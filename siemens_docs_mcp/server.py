@@ -12,16 +12,30 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from siemens_docs_mcp import tools
-from siemens_docs_mcp.catalog import Catalog, CatalogError
+from siemens_docs_mcp.catalog import (
+    HOST_ALIASES,
+    Catalog,
+    CatalogError,
+    ReferenceFormat,
+)
 from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HOSTS = ("docs.tia.siemens.cloud", "docs.industrial-operations-x.siemens.cloud")
+DEFAULT_HOSTS = tuple(HOST_ALIASES.values())
 DEFAULT_LOCALE = "en-US"
 DEFAULT_MIN_INTERVAL = 0.3
 
-_URL_DOC = "Reader URLs from any search result, TOC line or page link are valid input."
+_URL_DOC = (
+    "Pass reader URLs or compact references in the unchanged `url` parameter. "
+    "Compact forms: <prefix>:<mapId> or <prefix>:<mapId>/<contentId>; "
+    "stable prefixes tia=docs.tia.siemens.cloud and iox=docs.industrial-operations-x.siemens.cloud. "
+    "Any allowed host may also use its full hostname as prefix."
+)
+_REFERENCE_DOC = (
+    "Tool-generated addresses default to compact references; set reference_format='url' for reader URLs. "
+    "Page-body links are unchanged."
+)
 _FILTER_DOC = (
     "`product` (e.g. 'STEP 7', 'WinCC Unified', 'SIMATIC AX') and `version` (e.g. 'V21', '6.1') "
     "are matched against the catalog; call list_publications to see valid values."
@@ -66,8 +80,8 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
 
     @server.tool(description=(
         f"""Full-text search of Siemens documentation. Returns a numbered Markdown list (1-50 hits via `limit`):
-        title, publication + version, breadcrumb, excerpt and reader URL, with the total hit count.
-        Pass a result's reader URL to read_page or get_toc. {_FILTER_DOC} {hosts_doc}"""
+        title, publication + version, breadcrumb, excerpt and reference, with the total hit count.
+        Pass a result's reference to read_page or get_toc. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
     ))
     def search_docs(
         query: str,
@@ -76,34 +90,38 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
         version: str | None = None,
         locale: str | None = None,
         limit: int = 10,
+        reference_format: ReferenceFormat = "compact",
     ) -> str:
         with _tool_errors():
             return tools.search_docs(
-                catalog, query, host or settings.hosts[0], locale or settings.locale, product, version, limit
+                catalog, query, host or settings.hosts[0], locale or settings.locale, product, version, limit,
+                reference_format=reference_format,
             )
 
     @server.tool(description=(
-        f"""Read one documentation page as Markdown, with a header (publication, version, breadcrumb, source URL).
+        f"""Read one documentation page as Markdown, with a header (publication, version, breadcrumb, source reference).
         If the page is longer than `max_chars`, the end says how to continue with a larger `offset`.
-        {_URL_DOC} {hosts_doc}"""
+        {_URL_DOC} {_REFERENCE_DOC} {hosts_doc}"""
     ))
-    def read_page(url: str, offset: int = 0, max_chars: int = 20000) -> str:
+    def read_page(
+        url: str, offset: int = 0, max_chars: int = 20000, reference_format: ReferenceFormat = "compact",
+    ) -> str:
         with _tool_errors():
-            return tools.read_page(catalog, url, offset, max_chars)
+            return tools.read_page(catalog, url, offset, max_chars, reference_format=reference_format)
 
     @server.tool(description=(
         f"""Show the table of contents (1-6 levels via `depth`) of the publication, or of the subtree under the
-        topic, in `url`: an indented outline, one line per node with title and reader URL.
-        {_URL_DOC} {hosts_doc}"""
+        topic, in `url`: an indented outline, one line per node with title and reference.
+        {_URL_DOC} {_REFERENCE_DOC} {hosts_doc}"""
     ))
-    def get_toc(url: str, depth: int = 2) -> str:
+    def get_toc(url: str, depth: int = 2, reference_format: ReferenceFormat = "compact") -> str:
         with _tool_errors():
-            return tools.get_toc(catalog, url, depth)
+            return tools.get_toc(catalog, url, depth, reference_format=reference_format)
 
     @server.tool(description=(
-        f"""List documentation publications (up to 50 rows): title, product, version, locale and reader URL.
-        Use it to discover valid `product` and `version` values; reader URLs are valid input to read_page and
-        get_toc. {_FILTER_DOC} {hosts_doc}"""
+        f"""List documentation publications (up to 50 rows): title, product, version, locale and reference.
+        Use it to discover valid `product` and `version` values; references are valid input to read_page and
+        get_toc. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
     ))
     def list_publications(
         host: str | None = None,
@@ -111,10 +129,12 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
         version: str | None = None,
         locale: str | None = None,
         title_contains: str | None = None,
+        reference_format: ReferenceFormat = "compact",
     ) -> str:
         with _tool_errors():
             return tools.list_publications(
-                catalog, host or settings.hosts[0], locale or settings.locale, product, version, title_contains
+                catalog, host or settings.hosts[0], locale or settings.locale, product, version, title_contains,
+                reference_format=reference_format,
             )
 
     return server
