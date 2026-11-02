@@ -5,9 +5,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
+from bs4 import BeautifulSoup
 
 from siemens_docs_mcp import tools
-from tests.conftest import TIA_HOST, make_hit
+from tests.conftest import IOX_HOST, TIA_HOST, make_hit
+from tests.test_live import _addresses
 
 FIXTURES = Path(__file__).with_name("fixtures")
 
@@ -35,25 +37,45 @@ def test_legacy_output_baselines(catalog, reference_cases):
     assert set(recorded) == set(reference_cases)
     assert len(reference_cases) == 8
     for case, (tool_name, kwargs) in reference_cases.items():
-        actual = getattr(tools, tool_name)(catalog, **kwargs)
+        actual = getattr(tools, tool_name)(catalog, **kwargs, reference_format="url")
         assert actual == recorded[case]["output"], case
         assert len(actual) == recorded[case]["chars"], case
 
 
-def test_reference_case_addresses_roundtrip(catalog, reference_cases):
-    for tool_name, kwargs in reference_cases.values():
-        output = getattr(tools, tool_name)(catalog, **kwargs)
-        for line in output.splitlines():
-            if "https://" not in line:
-                continue
-            url = "https://" + line.split("https://", 1)[1]
-            assert "> Source:" in tools.read_page(catalog, url)
-            assert tools.get_toc(catalog, url).strip()
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+@pytest.mark.parametrize("prefix,host", [("tia", TIA_HOST), ("iox", IOX_HOST)])
+def test_reference_case_addresses_roundtrip(catalog, reference_cases, reference_format, prefix, host):
+    for case, (tool_name, kwargs) in reference_cases.items():
+        if not case.startswith(prefix + "_"):
+            continue
+        output = getattr(tools, tool_name)(catalog, **kwargs, reference_format=reference_format)
+        addresses = _addresses(output)
+        assert addresses, case
+        for address in addresses:
+            target = catalog.resolve(address)
+            assert target.host == host
+            assert address.startswith(prefix + ":" if reference_format == "compact" else f"https://{host}/r/")
+            publication = catalog.maps(host)[target.map_id]
+            page = tools.read_page(catalog, address, reference_format=reference_format)
+            assert f"> Publication: {publication.title} ({publication.version}) [{publication.locale}]" in page
+            assert page.split("\n\n", 1)[1].strip()
+            source = catalog.resolve(_addresses(page)[0])
+            root = catalog.toc(host, target.map_id)
+            expected_content = target.content_id or root.content_id or root.children[0].content_id
+            expected_html = catalog.client(host).contents[(target.map_id, expected_content)]
+            expected_text = BeautifulSoup(expected_html, "html.parser").get_text("\n").splitlines()
+            assert all(text in page.split("\n\n", 1)[1] for text in expected_text if text.strip())
+            source_content = source.content_id or root.content_id or root.children[0].content_id
+            assert (source.host, source.map_id, source_content) == (host, target.map_id, expected_content)
+            toc = tools.get_toc(catalog, address, reference_format=reference_format)
+            first = catalog.resolve(_addresses(toc)[0])
+            assert (first.host, first.map_id) == (host, target.map_id)
+            assert (first.content_id or root.content_id or None) == (target.content_id or root.content_id or None)
 
 
 def test_long_path_toc_baseline(catalog, long_reference_toc):
     url, expected_ids = long_reference_toc
-    output = tools.get_toc(catalog, url, depth=1)
+    output = tools.get_toc(catalog, url, depth=1, reference_format="url")
     lines = output.splitlines()
     assert len(lines) == 301
     assert len(output) == 77868

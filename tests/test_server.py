@@ -33,6 +33,13 @@ async def test_tools_registered(server):
         tools = (await client.list_tools()).tools
     assert {t.name for t in tools} == TOOLS
     assert all("docs.tia.siemens.cloud" in (t.description or "") for t in tools)
+    for tool in tools:
+        properties = tool.input_schema["properties"]
+        assert properties["reference_format"]["enum"] == ["compact", "url"]
+        assert properties["reference_format"]["default"] == "compact"
+        if tool.name in {"read_page", "get_toc"}:
+            assert "url" in tool.input_schema["required"]
+            assert "ref" not in properties
 
 
 @pytest.mark.anyio
@@ -78,3 +85,32 @@ async def test_empty_string_optional_params_are_ignored(server, fake_tia):
     assert "STEP 7 Basic" in pubs.content[0].text
     assert not hits.is_error, hits.content[0].text
     assert fake_tia.search_calls[0]["locale"] == "en-US"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("name,args", [
+    ("search_docs", {"query": "x"}), ("list_publications", {}),
+    ("read_page", {"url": "tia:tia2/t-p1"}), ("get_toc", {"url": "tia:tia2"}),
+])
+async def test_mcp_reference_formats(server, fake_tia, name, args):
+    from tests.conftest import make_hit, make_search_response
+
+    fake_tia.search_response = make_search_response([make_hit()])
+    async with Client(server) as client:
+        compact = await client.call_tool(name, args)
+        url = await client.call_tool(name, {**args, "reference_format": "url"})
+    assert not compact.is_error, compact.content[0].text
+    assert not url.is_error, url.content[0].text
+    assert "tia:tia2" in compact.content[0].text
+    assert "https://docs.tia.siemens.cloud/r/" in url.content[0].text
+
+
+@pytest.mark.anyio
+async def test_invalid_format_rejected_before_fetch(server, fake_tia, fake_iox):
+    async with Client(server) as client:
+        result = await client.call_tool("read_page", {"url": "tia:tia2", "reference_format": "json"})
+    assert result.is_error
+    assert "reference_format" in result.content[0].text
+    for fake in (fake_tia, fake_iox):
+        assert fake.list_maps_calls == 0
+        assert fake.search_calls == fake.get_pages_calls == fake.get_content_calls == []

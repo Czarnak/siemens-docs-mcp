@@ -51,10 +51,22 @@ Tools:
 |---------------------|---------------------------------------------------------------------------|
 | `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`).      |
 | `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
-| `get_toc`           | Table of contents of a publication or of the subtree under a topic URL.   |
+| `get_toc`           | Table of contents of a publication or of the subtree under a topic reference. |
 | `list_publications` | List publications; discover valid `product` / `version` values.           |
 
-Any reader URL returned by a tool (or copied from the browser) is valid input to `read_page` and `get_toc`.
+All four tools emit compact references by default. Publication references use
+`<prefix>:<mapId>`; topic references use `<prefix>:<mapId>/<contentId>`, for example
+`tia:MyPublication/MyTopic`. Stable prefixes `tia` and `iox` identify
+`docs.tia.siemens.cloud` and `docs.industrial-operations-x.siemens.cloud`.
+Additional allowed hosts use their full hostname as the prefix; full hostnames
+also work for the built-in hosts. Prefixes are case-insensitive; IDs retain case.
+
+Pass a compact reference or any reader URL returned by a tool (or copied from the
+browser) in the unchanged `url` argument: `read_page(url="tia:MyPublication/MyTopic")`
+or `get_toc(url="tia:MyPublication")`. Set `reference_format="url"` on any tool to
+emit full reader URLs. Only tool-generated address fields change; page-body links
+remain unchanged. The CLI continues to use reader URLs in its configuration;
+compact references are an MCP tool interface.
 
 Environment variables:
 

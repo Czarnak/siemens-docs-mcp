@@ -73,7 +73,7 @@ def test_render_toc_indentation_and_explicit_cap():
     outline = "- Manual — https://example.test/r/m\n  - A — https://example.test/r/m/c"
     assert render_toc(rows, False, 2) == outline
     assert render_toc(rows, True, 2) == (
-        outline + "\n… truncated at 2 lines — use a deeper URL or a smaller depth."
+        outline + "\n… truncated at 2 lines — use a deeper reference or a smaller depth."
     )
 
 

@@ -56,5 +56,5 @@ def render_page(publication: MapInfo, path: Sequence[str], source: str, chunk: s
 def render_toc(rows: Sequence[tuple[int, str, str]], truncated: bool, limit: int) -> str:
     lines = [f"{'  ' * level}- {title} — {reference}" for level, title, reference in rows]
     if truncated:
-        lines.append(f"… truncated at {limit} lines — use a deeper URL or a smaller depth.")
+        lines.append(f"… truncated at {limit} lines — use a deeper reference or a smaller depth.")
     return "\n".join(lines)
