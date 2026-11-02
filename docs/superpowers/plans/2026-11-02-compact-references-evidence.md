@@ -298,7 +298,7 @@ whether upstream identity fields themselves changed. This limits that historical
 claim without invalidating the observed same-node candidate comparison. No
 reduction ratio or token/timing claim is made from these measurements.
 
-### Scope and remaining review
+### Scope and review status
 
 The delivered MCP schema has exactly four tools; each exposes optional
 `reference_format` with enum `compact`, `url` and default `compact`. Required
@@ -308,6 +308,10 @@ The independent stage A extraction remains recoverable at its own commit.
 Git comparison confirms CLI, converter, and dependencies unchanged from the
 implementation baseline, and the live target manifest unchanged from Task 1.
 Task 5 changes no production code or unrelated files. Existing cap/pagination
-and URL-based export tests pass. The implementer self-reviewed the qualification
-diff; controller whole-branch independent review remains pending. No push, PR,
-merge, deployment, or release was performed.
+and URL-based export tests pass. All five tasks were implemented and independently
+task-reviewed. The implementer self-reviewed the qualification diff; whole-branch
+independent review of
+`f774c294c77cc84f20ed436a552b991350f11bc3..bb9ef389da1e04ca98aea20c84c7ceb58e4f0c6a`
+found no Critical or Important issues and one minor stale-handoff documentation
+finding, addressed in the plan/evidence correction. This correction still requires
+scoped review. No push, PR, merge, deployment, or release was performed.
