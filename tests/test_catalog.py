@@ -2,18 +2,162 @@ from urllib.parse import quote
 
 import pytest
 
-from siemens_docs_mcp.catalog import Catalog, CatalogError, MapInfo, Resolved
+from siemens_docs_mcp.catalog import (
+    Catalog,
+    CatalogError,
+    MapInfo,
+    Resolved,
+    validate_reference_format,
+)
 from siemens_docs_mcp.toc import find_path, parse_toc
 from tests.conftest import (
     IOX_HOST,
     SHARED_PRETTY,
     TIA_HOST,
+    FakeClient,
     make_map,
     make_node,
     make_toc,
 )
 
 TIA_DOC = f"https://{TIA_HOST}/r/en-us/v21/doc"
+
+
+def test_compact_reference_contract(catalog, fake_tia, fake_iox):
+    assert catalog.resolve(" TIA:tia2/tia2-p1 ") == Resolved(TIA_HOST, "tia2", "tia2-p1")
+    assert catalog.resolve("iox:iox1").content_id is None
+    assert catalog.compact_ref(Resolved(TIA_HOST, "Ab~.-_1", "Cd2")) == "tia:Ab~.-_1/Cd2"
+    assert catalog.id_url(Resolved(IOX_HOST, "iox1", None)) == f"https://{IOX_HOST}/r/iox1"
+    assert catalog.resolve("tia:tia2/arbitrary-topic") == Resolved(TIA_HOST, "tia2", "arbitrary-topic")
+    assert fake_tia.get_pages_calls == fake_iox.get_pages_calls == []
+
+
+@pytest.mark.parametrize("value", [
+    "tia:", "tia:/c", "tia:m/", "tia:m/c/x", "tia:m//c", "tia:../c", "tia:m/.",
+    "tia:m/%2F", "tia:m?x=1", "tia:m/c#h", "tia:ti a2/c", "tia:tia2/c d",
+    "tia :tia2/c", "unknown:tia2/c", "evil.example:tia2/c", "tia:./c", "tia:m/..",
+    "tia:m%2Fc", "tia:m/c?x=1", "tia:m#h", "tia:m\nc", "tia:m:c", "tia:m\\c",
+])
+def test_compact_syntax_rejected_before_fetch(catalog, fake_tia, fake_iox, value):
+    def calls():
+        return [
+            (client.list_maps_calls, list(client.get_pages_calls),
+             list(client.get_content_calls), list(client.search_calls))
+            for client in (fake_tia, fake_iox)
+        ]
+
+    before = calls()
+    with pytest.raises(CatalogError):
+        catalog.resolve(value)
+    assert calls() == before
+
+
+@pytest.mark.parametrize("map_id, content_id", [
+    ("Ab~.-_1", "Cd2"), ("门户", "żółć_2"), ("m", None),
+])
+def test_compact_identifier_grammar(catalog, fake_tia, map_id, content_id):
+    fake_tia.maps.append(make_map(map_id, "Grammar"))
+    suffix = "" if content_id is None else f"/{content_id}"
+    target = Resolved(TIA_HOST, map_id, content_id)
+    assert catalog.resolve(f"tia:{map_id}{suffix}") == target
+    assert catalog.compact_ref(target) == f"tia:{map_id}{suffix}"
+    assert fake_tia.get_pages_calls == []
+
+
+def test_compact_unknown_publication_has_useful_error(catalog):
+    with pytest.raises(CatalogError, match="search_docs.*list_publications"):
+        catalog.resolve("tia:missing/topic")
+
+
+def test_protocol_relative_reader_url_is_preserved(catalog):
+    assert catalog.resolve("//docs.tia.siemens.cloud/r/tia2/tia2-p1") == Resolved(
+        TIA_HOST, "tia2", "tia2-p1",
+    )
+
+
+def test_prefix_identity_survives_restart_and_host_order(fake_tia, fake_iox):
+    for client in (fake_tia, fake_iox):
+        client.maps.append(make_map("same-map", "Same IDs"))
+    clients = {TIA_HOST: fake_tia, IOX_HOST: fake_iox}
+    for hosts in ([TIA_HOST, IOX_HOST], [IOX_HOST, TIA_HOST]):
+        fresh = Catalog(hosts, lambda host: clients[host])
+        assert fresh.resolve("tia:same-map/same-topic") == Resolved(TIA_HOST, "same-map", "same-topic")
+        assert fresh.resolve("iox:same-map/same-topic") == Resolved(IOX_HOST, "same-map", "same-topic")
+    assert fake_tia.get_pages_calls == fake_iox.get_pages_calls == []
+
+
+@pytest.mark.parametrize("host, prefix", [
+    (TIA_HOST, "tia"), (IOX_HOST, "iox"), ("docs.example.com", "docs.example.com"),
+])
+def test_literal_host_roundtrip(host, prefix):
+    client = FakeClient(host, [make_map("Ab1", "Literal host")])
+    fresh = Catalog([host], lambda host: client)
+    target = Resolved(host, "Ab1", "Cd2")
+    assert fresh.resolve(f"{host.upper()}:Ab1/Cd2") == target
+    assert fresh.compact_ref(target) == f"{prefix}:Ab1/Cd2"
+    assert fresh.resolve(fresh.compact_ref(target)) == target
+
+
+def test_compact_spelling_does_not_fetch(catalog, monkeypatch):
+    def unexpected(*args):
+        raise AssertionError("Spelling a known target must not fetch")
+
+    monkeypatch.setattr(catalog, "_factory", unexpected)
+    monkeypatch.setattr(catalog, "maps", unexpected)
+    monkeypatch.setattr(catalog, "toc", unexpected)
+    assert catalog.compact_ref(Resolved(TIA_HOST.upper(), "Ab~.-_1", "Cd2")) == "tia:Ab~.-_1/Cd2"
+    assert catalog.compact_ref(Resolved(IOX_HOST, "iox1", None)) == "iox:iox1"
+    assert catalog.id_url(Resolved(TIA_HOST.upper(), "legacy/map", "legacy topic")) == (
+        f"https://{TIA_HOST}/r/legacy/map/legacy topic"
+    )
+    assert catalog.fallback_reader_url(f" https://{TIA_HOST}/r/pretty/path ") == (
+        f"https://{TIA_HOST}/r/pretty/path"
+    )
+
+
+@pytest.mark.parametrize("target", [
+    Resolved("evil.example", "m", "c"), Resolved(TIA_HOST, "", "c"),
+    Resolved(TIA_HOST, "..", "c"), Resolved(TIA_HOST, "m/c", None),
+    Resolved(TIA_HOST, "m", ""), Resolved(TIA_HOST, "m", "."),
+    Resolved(TIA_HOST, "m", "%2F"), Resolved(TIA_HOST, "m", "c d"),
+])
+def test_compact_spelling_rejects_invalid_target(catalog, target):
+    with pytest.raises(CatalogError):
+        catalog.compact_ref(target)
+
+
+def test_id_url_rejects_unknown_host(catalog):
+    with pytest.raises(CatalogError):
+        catalog.id_url(Resolved("evil.example", "m", "c"))
+
+
+@pytest.mark.parametrize("value, expected", [
+    (f" https://{TIA_HOST}/r/en-us/v21/doc ", f"https://{TIA_HOST}/r/en-us/v21/doc"),
+    (f"https://{IOX_HOST}/r/iox1?x=1#h", f"https://{IOX_HOST}/r/iox1?x=1#h"),
+    (f"https://{TIA_HOST.upper()}/r/m", f"https://{TIA_HOST.upper()}/r/m"),
+    (None, None), (123, None), ({}, None), ("", None),
+    ("https://evil.example/r/m", None), (f"https://{TIA_HOST}/r/", None),
+    (f"https://{TIA_HOST}/r", None), (f"https://{TIA_HOST}/other", None),
+    (f"https://user@{TIA_HOST}/r/m", None), (f"https://user:pass@{TIA_HOST}/r/m", None),
+    (f"http://{TIA_HOST}/r/m", None), (f"ftp://{TIA_HOST}/r/m", None),
+    (f"//{TIA_HOST}/r/m", None), ("https://[broken/r/m", None),
+])
+def test_upstream_url_fallback(catalog, fake_tia, fake_iox, value, expected):
+    assert catalog.fallback_reader_url(value) == expected
+    for client in (fake_tia, fake_iox):
+        assert client.list_maps_calls == 0
+        assert client.get_pages_calls == client.get_content_calls == client.search_calls == []
+
+
+@pytest.mark.parametrize("value", ["compact", "url"])
+def test_validate_reference_format_accepts_exact_values(value):
+    assert validate_reference_format(value) == value
+
+
+@pytest.mark.parametrize("value", ["URL", "Compact", " compact ", "", "json", None])
+def test_validate_reference_format_rejects_other_values(value):
+    with pytest.raises(ValueError, match="compact.*url"):
+        validate_reference_format(value)
 
 
 def test_maps_parsed_from_metadata(catalog):

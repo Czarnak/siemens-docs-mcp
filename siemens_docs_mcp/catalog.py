@@ -17,14 +17,24 @@ from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
 
 log = logging.getLogger(__name__)
 
+HOST_ALIASES = {"tia": "docs.tia.siemens.cloud", "iox": "docs.industrial-operations-x.siemens.cloud"}
+ReferenceFormat = Literal["compact", "url"]
+
 TIA_VERSION_KEY = "tia:SoftwareVersionFilter"
 SW_VERSION_KEY = "SoftwareVersion"
 _VERSION_KEYS = (TIA_VERSION_KEY, SW_VERSION_KEY)
 _CONTENT_ID = re.compile(r"[\w~.-]+")
+_COMPACT_REF = re.compile(r"([\w.-]+):([\w~.-]+)(?:/([\w~.-]+))?")
 
 
 class CatalogError(ValueError):
     """Raised for unknown hosts, unresolvable URLs, and unknown filter values."""
+
+
+def validate_reference_format(value: str) -> ReferenceFormat:
+    if value == "compact" or value == "url":
+        return value
+    raise ValueError(f"reference_format must be 'compact' or 'url', got {value!r}")
 
 
 @dataclass(frozen=True)
@@ -199,6 +209,12 @@ class Catalog:
         failure = CatalogError(
             f"Could not resolve {url}. Use search_docs or list_publications to find a valid reader URL."
         )
+        value = url.strip()
+        if "://" not in value and not value.startswith("//"):
+            target = self._parse_compact_ref(value)
+            if target.map_id not in self.maps(target.host):
+                raise failure
+            return target
         parts = urlsplit(url.strip())
         host = self._check_host(parts.hostname or "")
         path = unquote(parts.path).rstrip("/")
@@ -234,6 +250,47 @@ class Catalog:
                     return Resolved(host, m.id, page.content_id)
         raise failure
 
+    def _parse_compact_ref(self, value: str) -> Resolved:
+        match = _COMPACT_REF.fullmatch(value)
+        if not match or any(segment in (".", "..") for segment in match.groups()[1:]):
+            raise CatalogError(
+                f"Invalid compact reference {value!r}. Use <prefix>:<mapId>[/<contentId>]; "
+                "find references with search_docs or list_publications."
+            )
+        prefix, map_id, content_id = match.groups()
+        host = self._check_host(HOST_ALIASES.get(prefix.lower(), prefix))
+        return Resolved(host, map_id, content_id)
+
+    def compact_ref(self, target: Resolved) -> str:
+        host = self._check_host(target.host)
+        prefix = next((alias for alias, value in HOST_ALIASES.items() if value == host), host)
+        suffix = "" if target.content_id is None else f"/{target.content_id}"
+        value = f"{prefix}:{target.map_id}{suffix}"
+        if self._parse_compact_ref(value) != Resolved(host, target.map_id, target.content_id):
+            raise CatalogError(f"Invalid compact target {target!r}")
+        return value
+
+    def id_url(self, target: Resolved) -> str:
+        host = self._check_host(target.host)
+        suffix = "" if target.content_id is None else f"/{target.content_id}"
+        return f"https://{host}/r/{target.map_id}{suffix}"
+
+    def fallback_reader_url(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        value = value.strip()
+        try:
+            parts = urlsplit(value)
+            if (
+                parts.scheme != "https" or parts.hostname not in self.hosts
+                or parts.username is not None or parts.password is not None
+                or not parts.path.startswith("/r/") or not parts.path[3:].strip("/")
+            ):
+                return None
+        except ValueError:
+            return None
+        return value
+
     def _pretty_ok(self, host: str, map_id: str) -> str:
         """The map's pretty URL if it identifies the map unambiguously, else ""."""
         info = self.maps(host).get(map_id)
@@ -244,7 +301,8 @@ class Catalog:
     def map_url(self, host: str, map_id: str) -> str:
         """Reader URL of a publication: its pretty URL, or the id form when missing or shared."""
         host = self._check_host(host)
-        return f"https://{host}/r/{self._pretty_ok(host, map_id) or map_id}"
+        pretty = self._pretty_ok(host, map_id)
+        return f"https://{host}/r/{pretty}" if pretty else self.id_url(Resolved(host, map_id, None))
 
     def reader_url(self, host: str, map_id: str, page: TocPage) -> str:
         host = self._check_host(host)
@@ -252,4 +310,4 @@ class Catalog:
             return self.map_url(host, map_id)
         if page.pretty_url and self._pretty_ok(host, map_id):
             return f"https://{host}{page.pretty_url}"
-        return f"https://{host}/r/{map_id}/{page.content_id}"
+        return self.id_url(Resolved(host, map_id, page.content_id))

@@ -12,12 +12,12 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from siemens_docs_mcp import tools
-from siemens_docs_mcp.catalog import Catalog, CatalogError
+from siemens_docs_mcp.catalog import HOST_ALIASES, Catalog, CatalogError
 from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HOSTS = ("docs.tia.siemens.cloud", "docs.industrial-operations-x.siemens.cloud")
+DEFAULT_HOSTS = tuple(HOST_ALIASES.values())
 DEFAULT_LOCALE = "en-US"
 DEFAULT_MIN_INTERVAL = 0.3
 
