@@ -1,4 +1,4 @@
-"""MCP tool logic: pure functions returning Markdown strings."""
+"""MCP tool retrieval, normalization, and pagination returning Markdown strings."""
 from __future__ import annotations
 
 import logging
@@ -13,6 +13,13 @@ from siemens_docs_mcp.catalog import (
 )
 from siemens_docs_mcp.content import fetch_html
 from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.rendering import (
+    SearchHit,
+    render_page,
+    render_publications,
+    render_search,
+    render_toc,
+)
 from siemens_docs_mcp.toc import TocPage, find_path
 
 log = logging.getLogger(__name__)
@@ -24,24 +31,22 @@ MAX_DEPTH = 6
 MAX_TOC_LINES = 500
 
 
-def _hit_version(topic: dict) -> str:
+def _normalize_hit(topic: dict, reference: str) -> SearchHit:
     meta = {m.get("key"): m.get("values") or [] for m in topic.get("metadata", [])}
+    version = ""
     for key in (TIA_VERSION_KEY, SW_VERSION_KEY):
         if meta.get(key):
-            return meta[key][0]
-    return ""
-
-
-def _format_hit(index: int, topic: dict) -> str:
-    version = _hit_version(topic)
-    suffix = f" ({version})" if version else ""
+            version = meta[key][0]
+            break
     # Highlight spans carry their own spacing; a get_text separator would split "on-delay" into "on - delay".
     excerpt = " ".join(BeautifulSoup(topic.get("htmlExcerpt") or "", "html.parser").get_text().split())
-    return (
-        f"{index}. **{topic.get('title', '')}** — {topic.get('mapTitle', '')}{suffix}\n"
-        f"   {' > '.join(topic.get('breadcrumb') or [])}\n"
-        f"   {excerpt}\n"
-        f"   {topic.get('readerUrl', '')}"
+    return SearchHit(
+        title=topic.get("title", ""),
+        map_title=topic.get("mapTitle", ""),
+        version=version,
+        breadcrumb=tuple(topic.get("breadcrumb") or []),
+        excerpt=excerpt,
+        reference=reference,
     )
 
 
@@ -72,10 +77,10 @@ def search_docs(
         if topic:
             topics.append(topic)
     if not topics:
-        return f'No results for "{query}" on {host}.'
+        return render_search(query, host, 0, [])
     total = data.get("paging", {}).get("totalResultsCount", len(topics))
-    header = f'Found {total} results for "{query}" on {host}. Showing {len(topics)}:'
-    return "\n".join([header, *(_format_hit(i, t) for i, t in enumerate(topics, 1))])
+    hits = [_normalize_hit(topic, topic.get("readerUrl", "")) for topic in topics]
+    return render_search(query, host, total, hits)
 
 
 def list_publications(
@@ -92,15 +97,8 @@ def list_publications(
     maps = catalog.filter(
         host, product=product or None, version=version or None, locale=locale, title_contains=title_contains or None
     )
-    if not maps:
-        return f"No publications match these filters on {host}."
-    rows = [
-        f"- **{m.title}** — {m.product} {m.version} [{m.locale}] {catalog.map_url(host, m.id)}"
-        for m in maps[:MAX_PUBLICATIONS]
-    ]
-    if len(maps) > MAX_PUBLICATIONS:
-        rows.append(f"Showing {MAX_PUBLICATIONS} of {len(maps)} — narrow your filters.")
-    return "\n".join(rows)
+    rows = [(m, catalog.map_url(host, m.id)) for m in maps[:MAX_PUBLICATIONS]]
+    return render_publications(host, rows, len(maps), MAX_PUBLICATIONS)
 
 
 def read_page(catalog: Catalog, url: str, offset: int = 0, max_chars: int = 20000) -> str:
@@ -132,12 +130,7 @@ def read_page(catalog: Catalog, url: str, offset: int = 0, max_chars: int = 2000
     chunk = body[offset:end]
     if end < len(body):
         chunk += f"\n\n[truncated — call again with offset={end}]"
-    header = (
-        f"> Publication: {info.title} ({info.version}) [{info.locale}]\n"
-        f"> Path: {' > '.join(titles)}\n"
-        f"> Source: {source}"
-    )
-    return f"{header}\n\n{chunk}"
+    return render_page(info, titles, source, chunk)
 
 
 def get_toc(catalog: Catalog, url: str, depth: int = 2) -> str:
@@ -155,15 +148,13 @@ def get_toc(catalog: Catalog, url: str, depth: int = 2) -> str:
                 f"Topic {res.content_id} is not in this publication's TOC. Use search_docs to find a valid URL."
             )
         start = path[-1]
-    lines: list[str] = []
+    rows: list[tuple[int, str, str]] = []
 
     def walk(node: TocPage, level: int) -> None:
-        lines.append(f"{'  ' * level}- {node.title or pub_title} — {catalog.reader_url(res.host, res.map_id, node)}")
+        rows.append((level, node.title or pub_title, catalog.reader_url(res.host, res.map_id, node)))
         if level < depth:
             for child in node.children:
                 walk(child, level + 1)
 
     walk(start, 0)
-    if len(lines) > MAX_TOC_LINES:
-        lines = [*lines[:MAX_TOC_LINES], f"… truncated at {MAX_TOC_LINES} lines — use a deeper URL or a smaller depth."]
-    return "\n".join(lines)
+    return render_toc(rows[:MAX_TOC_LINES], len(rows) > MAX_TOC_LINES, MAX_TOC_LINES)

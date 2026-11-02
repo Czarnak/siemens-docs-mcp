@@ -82,6 +82,11 @@ def test_search_docs_no_results(catalog, fake_tia):
     assert search_docs(catalog, "zzz", TIA_HOST, "en-US") == f'No results for "zzz" on {TIA_HOST}.'
 
 
+def test_search_docs_empty_results_do_not_require_paging(catalog, fake_tia):
+    fake_tia.search_response = {"results": [], "paging": None}
+    assert search_docs(catalog, "zzz", TIA_HOST, "en-US") == f'No results for "zzz" on {TIA_HOST}.'
+
+
 def test_list_publications_filters_and_cap(catalog, fake_tia):
     fake_tia.maps = [make_map(f"m{i:02d}", f"Doc {i:02d}", pretty=f"en-us/v21/d{i}") for i in range(60)]
     out = list_publications(catalog, TIA_HOST, "en-us", product="step 7")
