@@ -8,10 +8,49 @@ import pytest
 from bs4 import BeautifulSoup
 
 from siemens_docs_mcp import tools
-from tests.conftest import IOX_HOST, TIA_HOST, make_hit
+from tests.conftest import IOX_HOST, TIA_HOST, make_hit, make_map, make_node, make_toc
 from tests.test_live import _addresses
 
 FIXTURES = Path(__file__).with_name("fixtures")
+
+EXPECTED_IDENTITIES = {
+    "tia_search": [("tia2", "tia2-p1")],
+    "tia_list": [("tia1", ""), ("tia2", ""), ("tia3", ""), ("tia4", "")],
+    "tia_read": [("tia2", "tia2-p1")],
+    "tia_toc": [("tia2", "tia2-root"), ("tia2", "tia2-ch1"), ("tia2", "tia2-p1")],
+    "iox_search": [("iox1", "iox1-p1")],
+    "iox_list": [("iox2", ""), ("iox1", "")],
+    "iox_read": [("iox1", "iox1-p1")],
+    "iox_toc": [("iox1", ""), ("iox1", "iox1-p1"), ("iox1", "iox1-p1a"), ("iox1", "iox1-p2")],
+}
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+def test_reference_output_budgets(catalog, reference_cases, reference_format):
+    recorded = json.loads((FIXTURES / "reference_outputs.json").read_text(encoding="utf-8"))
+    for case, (tool_name, kwargs) in reference_cases.items():
+        baseline = recorded[case]
+        actual = getattr(tools, tool_name)(catalog, **kwargs, reference_format=reference_format)
+        assert len(actual) <= baseline["max_chars"][reference_format], (case, reference_format, len(actual))
+        addresses = _addresses(actual)
+        assert len(addresses) == len(EXPECTED_IDENTITIES[case]), case
+        host = TIA_HOST if case.startswith("tia_") else IOX_HOST
+        identities = []
+        for address in addresses:
+            target = catalog.resolve(address)
+            assert target.host == host
+            content_id = target.content_id or ""
+            if case.endswith("_toc") and not content_id:
+                content_id = catalog.toc(host, target.map_id).content_id
+            identities.append((target.map_id, content_id))
+        assert identities == EXPECTED_IDENTITIES[case], case
+        # Keep every title, metadata field, excerpt and body byte from the golden output.
+        expected_content = baseline["output"]
+        for address in _addresses(expected_content):
+            expected_content = expected_content.replace(address, "<reference>", 1)
+        for address in addresses:
+            actual = actual.replace(address, "<reference>", 1)
+        assert actual == expected_content, case
 
 
 def test_search_fixture_identity_is_configurable():
@@ -88,3 +127,43 @@ def test_long_path_toc_baseline(catalog, long_reference_toc):
         assert (target.host, target.map_id) == (TIA_HOST, "long-reference")
         resolved_ids.append(target.content_id or catalog.toc(target.host, target.map_id).content_id)
     assert resolved_ids == expected_ids
+
+
+def test_long_toc_compact_is_smaller(catalog, long_reference_toc):
+    url, expected_ids = long_reference_toc
+    compact = tools.get_toc(catalog, url, depth=1)
+    url_output = tools.get_toc(catalog, url, depth=1, reference_format="url")
+    assert len(compact) < len(url_output)
+    addressed = []
+    for output in (compact, url_output):
+        assert len(output.splitlines()) == 301
+        identities = set()
+        for address in _addresses(output):
+            target = catalog.resolve(address)
+            assert (target.host, target.map_id) == (TIA_HOST, "long-reference")
+            identities.add(target.content_id or catalog.toc(target.host, target.map_id).content_id)
+        addressed.append(identities)
+    assert addressed[0] == addressed[1] == set(expected_ids)
+    assert [line.split(" — ")[0] for line in compact.splitlines()] == [
+        line.split(" — ")[0] for line in url_output.splitlines()
+    ]
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+def test_reference_toc_preserves_500_line_cap(catalog, fake_tia, reference_format):
+    pretty = "en-us/v21/big"
+    fake_tia.maps.append(make_map("big", "Big", pretty=pretty))
+    fake_tia.pages["big"] = make_toc("big-root", "Big", f"/r/{pretty}", [
+        make_node(f"bt{i}", f"big-p{i}", f"Topic {i}", f"/r/{pretty}/t{i}") for i in range(600)
+    ])
+    output = tools.get_toc(catalog, "tia:big", depth=1, reference_format=reference_format)
+    addresses = _addresses(output)
+    assert len(addresses) == 500
+    assert len(output.splitlines()) == 501
+    assert output.splitlines()[-1] == "… truncated at 500 lines — use a deeper reference or a smaller depth."
+    identities = []
+    for address in addresses:
+        target = catalog.resolve(address)
+        assert (target.host, target.map_id) == (TIA_HOST, "big")
+        identities.append(target.content_id or catalog.toc(target.host, target.map_id).content_id)
+    assert identities == ["big-root"] + [f"big-p{i}" for i in range(499)]
