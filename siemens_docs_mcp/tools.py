@@ -14,16 +14,18 @@ from siemens_docs_mcp.catalog import (
     Resolved,
     validate_reference_format,
 )
+from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 from siemens_docs_mcp.content import fetch_html
 from siemens_docs_mcp.converter import html_to_markdown
 from siemens_docs_mcp.rendering import (
     SearchHit,
     render_page,
     render_publications,
+    render_scoped_search,
     render_search,
     render_toc,
 )
-from siemens_docs_mcp.toc import TocPage, find_path
+from siemens_docs_mcp.toc import TocPage, find_path, iter_pages
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,11 @@ MAX_PUBLICATIONS = 50
 MIN_CHARS, MAX_CHARS = 1000, 100_000
 MAX_DEPTH = 6
 MAX_TOC_LINES = 500
+# Scoped search: the upstream metadata key holding a hit's map id (verified live on both hosts, 2026-11-05).
+PUBLICATION_FILTER_KEY = "ft:publicationId"
+# Subtree scope filters publication hits locally: read at most this many pages of this size.
+SCOPE_PAGE_SIZE = 100
+MAX_SCOPE_PAGES = 3
 
 
 def _search_reference(catalog: Catalog, host: str, topic: dict, reference_format: ReferenceFormat) -> str:
@@ -68,21 +75,130 @@ def _normalize_hit(topic: dict, reference: str) -> SearchHit:
     )
 
 
+def _topic_path(catalog: Catalog, res: Resolved) -> list[TocPage]:
+    """Root-to-topic TOC path for a topic reference (contentId or tocId)."""
+    path = find_path(catalog.toc(res.host, res.map_id), res.content_id or "")
+    if path is None:
+        raise CatalogError(
+            f"Topic {res.content_id} is not in this publication's TOC. Use search_docs to find a valid reference."
+        )
+    return path
+
+
+def _scoped_topics(data: dict, target: Resolved) -> list[dict]:
+    """One topic per cluster, taken from the scoped publication.
+
+    The API silently ignores filters it does not understand, so a cluster without an entry from the
+    scoped publication means the scope was not applied: fail rather than return out-of-scope hits.
+    """
+    topics = []
+    for cluster in data.get("results") or []:
+        candidates = [e["topic"] for e in cluster.get("entries", []) if e.get("type") == "TOPIC" and e.get("topic")]
+        if not candidates:
+            continue
+        topic = next((t for t in candidates if t.get("mapId") == target.map_id), None)
+        if topic is None:
+            raise FluidtopicsError(
+                None,
+                f"{target.host} did not apply the publication filter (returned a hit from publication "
+                f"{candidates[0].get('mapId')!r}); refusing to return results outside the scope.",
+            )
+        topics.append(topic)
+    return topics
+
+
+def _scan_subtree(
+    client: FluidtopicsClient, query: str, locale: str, target: Resolved, node: TocPage, limit: int,
+) -> tuple[list[dict], int, tuple[int, int] | None]:
+    """Publication-scoped pages filtered to ``node``'s subtree: (topics, matches, scan).
+
+    ``scan`` is ``(checked, publication_total)`` when the page cap stopped the scan early, else None
+    and ``matches`` is exact.
+    """
+    inside = {page.content_id for page in iter_pages(node)}
+    filters = [{"key": PUBLICATION_FILTER_KEY, "values": [target.map_id]}]
+    kept: list[dict] = []
+    checked = 0
+    publication_total = 0
+    for page in range(1, MAX_SCOPE_PAGES + 1):
+        data = client.search(query, locale, filters, page=page, per_page=SCOPE_PAGE_SIZE)
+        results = data.get("results") or []
+        paging = data.get("paging") or {}
+        checked += len(results)
+        # Each cluster yields one hit, so measure progress in clusters when the API reports them.
+        publication_total = paging.get("totalClustersCount", paging.get("totalResultsCount", checked))
+        kept += [t for t in _scoped_topics(data, target) if t.get("contentId") in inside]
+        if not results or paging.get("isLastPage") or checked >= publication_total:
+            return kept[:limit], len(kept), None
+        if len(kept) >= limit:
+            break
+    return kept[:limit], len(kept), (checked, publication_total)
+
+
+def _scoped_search(
+    catalog: Catalog,
+    query: str,
+    scope: str,
+    host: str | None,
+    locale: str | None,
+    product: str | None,
+    version: str | None,
+    limit: int,
+    reference_format: ReferenceFormat,
+) -> str:
+    if product or version:
+        raise ValueError("scope already selects one publication; omit product and version.")
+    target = catalog.resolve(scope)
+    if host and host.lower() != target.host:
+        raise ValueError(
+            f"host {host!r} does not match scope {scope!r}, which is on {target.host}; omit host or make them match."
+        )
+    info = catalog.maps(target.host)[target.map_id]
+    if locale and info.locale and locale.lower() != info.locale.lower():
+        raise ValueError(
+            f"locale {locale!r} does not match the scoped publication's locale {info.locale!r}; omit locale."
+        )
+    if not info.locale and not locale:
+        raise ValueError("The scoped publication has no locale metadata; pass locale.")
+    locale = info.locale or catalog.canonical(target.host, "locale", locale or "")
+    node = None
+    if target.content_id is not None:
+        path = _topic_path(catalog, target)
+        if len(path) > 1:  # the root topic stands for the whole publication
+            node = path[-1]
+    client = catalog.client(target.host)
+    scan = None
+    if node is None:
+        filters = [{"key": PUBLICATION_FILTER_KEY, "values": [target.map_id]}]
+        data = client.search(query, locale, filters, page=1, per_page=limit)
+        topics = _scoped_topics(data, target)
+        total = (data.get("paging") or {}).get("totalResultsCount", len(topics))
+    else:
+        topics, total, scan = _scan_subtree(client, query, locale, target, node, limit)
+    hits = [_normalize_hit(t, _search_reference(catalog, target.host, t, reference_format)) for t in topics]
+    return render_scoped_search(query, info, node.title if node else None, total, hits, scan)
+
+
 def search_docs(
     catalog: Catalog,
     query: str,
-    host: str,
-    locale: str,
+    host: str | None,
+    locale: str | None,
     product: str | None = None,
     version: str | None = None,
     limit: int = 10,
     *,
     reference_format: ReferenceFormat = "compact",
+    scope: str | None = None,
 ) -> str:
-    """Full-text search on one host; returns a Markdown list of hits."""
+    """Full-text search on one host, or within a publication/topic ``scope``; returns a Markdown list of hits."""
     validate_reference_format(reference_format)
     if not 1 <= limit <= MAX_LIMIT:
         raise ValueError(f"limit must be 1-{MAX_LIMIT}, got {limit}")
+    if scope:
+        return _scoped_search(catalog, query, scope, host, locale, product, version, limit, reference_format)
+    if not host or not locale:
+        raise ValueError("host and locale are required when no scope is given.")
     client = catalog.client(host)
     locale = catalog.canonical(host, "locale", locale)
     filters: list[dict] = []
@@ -178,14 +294,7 @@ def get_toc(catalog: Catalog, url: str, depth: int = 2, *, reference_format: Ref
     res = catalog.resolve(url)
     root = catalog.toc(res.host, res.map_id)
     pub_title = catalog.maps(res.host)[res.map_id].title
-    start = root
-    if res.content_id is not None:
-        path = find_path(root, res.content_id)
-        if path is None:
-            raise CatalogError(
-                f"Topic {res.content_id} is not in this publication's TOC. Use search_docs to find a valid reference."
-            )
-        start = path[-1]
+    start = root if res.content_id is None else _topic_path(catalog, res)[-1]
     rows: list[tuple[int, str, str]] = []
 
     def walk(node: TocPage, level: int) -> None:

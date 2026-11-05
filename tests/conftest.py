@@ -75,6 +75,8 @@ class FakeClient:
         self.pages: dict[str, dict] = {}
         self.contents: dict[tuple[str, str], str] = {}
         self.search_response: dict = {}
+        # Per-page responses (1-based); when set, they replace search_response and an unexpected page raises KeyError.
+        self.search_pages: dict[int, dict] = {}
         self.search_calls: list[dict] = []
         self.list_maps_calls = 0
         self.get_pages_calls: list[str] = []
@@ -96,7 +98,7 @@ class FakeClient:
         self.search_calls.append(
             {"query": query, "locale": locale, "filters": filters, "page": page, "per_page": per_page}
         )
-        return self.search_response
+        return self.search_pages[page] if self.search_pages else self.search_response
 
     def close(self) -> None:
         pass
@@ -228,6 +230,14 @@ def make_search_response(clusters: list[dict], total: int | None = None) -> dict
     # Real API shape: totals live under "paging" (verified live 2026-10-04).
     total = len(clusters) if total is None else total
     return {"paging": {"currentPage": 1, "totalResultsCount": total}, "results": clusters}
+
+
+def make_search_page(clusters: list[dict], total: int, page: int, last: bool) -> dict:
+    """One page of a paged search response, with the real API's isLastPage flag."""
+    return {
+        "paging": {"currentPage": page, "isLastPage": last, "totalResultsCount": total},
+        "results": clusters,
+    }
 
 
 def make_big_toc(n: int, content_id: str = "big-root") -> dict:
