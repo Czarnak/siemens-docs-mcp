@@ -64,8 +64,10 @@ also work for the built-in hosts. Prefixes are case-insensitive; IDs retain case
 Pass a compact reference or any reader URL returned by a tool (or copied from the
 browser) in the unchanged `url` argument: `read_page(url="tia:MyPublication/MyTopic")`
 or `get_toc(url="tia:MyPublication")`. Set `reference_format="url"` on any tool to
-emit full reader URLs. Only tool-generated address fields change; page-body links
-remain unchanged. The CLI continues to use reader URLs in its configuration;
+emit full reader URLs. In `read_page` bodies, links to other topics
+(`https://<host>/r/<mapId>/<contentId>`) become compact references too (or stay full
+URLs with `reference_format="url"`); other links are unchanged, and images keep only
+their alt text. Exported Markdown is not affected. The CLI continues to use reader URLs in its configuration;
 compact references are an MCP tool interface.
 
 To search inside a publication or chapter you already found, pass its reference as

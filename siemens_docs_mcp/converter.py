@@ -17,6 +17,7 @@ references are preserved as Markdown image links.
 """
 from __future__ import annotations
 
+import copy
 import html as html_module
 import re
 from collections.abc import Callable
@@ -120,8 +121,14 @@ def _inline_to_md(node: Tag | NavigableString, opts: _Options) -> str:
         return "\n"
     if name == "a":
         href = node.get("href", "")
-        content = "".join(_inline_to_md(c, opts) for c in node.children).strip()
-        label = _clean_text(content) or href
+        text = _clean_text("".join(_inline_to_md(c, opts) for c in node.children).strip())
+        if href and opts.link is not None:
+            href = opts.link(href)
+            if href is None:  # the hook keeps only the label
+                return text
+        if not text and not opts.images:  # e.g. an image link whose image was dropped
+            return ""
+        label = text or href
         return f"[{label}]({href})" if href else label
     if name in {"b", "strong"}:
         inner = _clean_text("".join(_inline_to_md(c, opts) for c in node.children))
@@ -216,8 +223,31 @@ def _render_block(tag: Tag, opts: _Options) -> list[Block]:
         return pieces
     # Inline-only unknown tag (dl, details, ...): keep its text via markdownify.
     if tag.get_text(strip=True):
-        return _block("other", markdownify(str(tag), heading_style="ATX").strip())
+        return _block("other", _markdownify(tag, opts))
     return []
+
+
+def _markdownify(tag: Tag, opts: _Options) -> str:
+    """markdownify fallback with the same link and image choices, applied to a copy of the tag."""
+    if opts.link is None and opts.images:
+        return markdownify(str(tag), heading_style="ATX").strip()
+    # Work on a copy inside a holder, so the tag itself (often the <a>) can also be rewritten or unwrapped.
+    holder = BeautifulSoup("", "html.parser")
+    holder.append(copy.copy(tag))  # bs4 copies the whole subtree, detached from the page
+    if not opts.images:
+        for img in holder.find_all("img"):
+            img.replace_with(img.get("alt") or "")
+        for a in holder.find_all("a"):
+            if not a.get_text(strip=True):
+                a.decompose()
+    if opts.link is not None:
+        for a in holder.find_all("a", href=True):
+            href = opts.link(a["href"])
+            if href is None:
+                a.unwrap()
+            else:
+                a["href"] = href
+    return markdownify(str(holder), heading_style="ATX").strip()
 
 
 def _block(kind: BlockKind, text: str) -> list[Block]:
@@ -227,9 +257,9 @@ def _block(kind: BlockKind, text: str) -> list[Block]:
 def _render_img(tag: Tag, opts: _Options) -> str:
     src = tag.get("src") or ""
     alt = tag.get("alt") or ""
-    # Skip embedded data URIs (text-only output)
-    if src.startswith("data:image/"):
-        return alt or ""
+    # Skip embedded data URIs (text-only output); with images off every image is its alt text.
+    if not opts.images or src.startswith("data:image/"):
+        return alt
     return f"![{alt}]({src})" if src else alt
 
 

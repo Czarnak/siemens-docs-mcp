@@ -33,8 +33,7 @@ _URL_DOC = (
     "Any allowed host may also use its full hostname as prefix."
 )
 _REFERENCE_DOC = (
-    "Tool-generated addresses default to compact references; set reference_format='url' for reader URLs. "
-    "Page-body links are unchanged."
+    "Tool-generated addresses default to compact references; set reference_format='url' for reader URLs."
 )
 _FILTER_DOC = (
     "`product` (e.g. 'STEP 7', 'WinCC Unified', 'SIMATIC AX') and `version` (e.g. 'V21', '6.1') "
@@ -110,6 +109,7 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
     @server.tool(description=(
         f"""Read one documentation page as Markdown, with a header (publication, version, breadcrumb, source reference).
         If the page is longer than `max_chars`, the end says how to continue with a larger `offset`.
+        Links to other topics in a page body follow reference_format; images keep only their alt text.
         {_URL_DOC} {_REFERENCE_DOC} {hosts_doc}"""
     ))
     def read_page(

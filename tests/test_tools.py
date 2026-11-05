@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from siemens_docs_mcp.catalog import CatalogError, Resolved
@@ -395,3 +397,19 @@ def test_toc_alias_canonical_source(catalog, reference_format, alias, canonical,
     assert get_toc(catalog, alias, reference_format=reference_format) == get_toc(
         catalog, canonical, reference_format=reference_format,
     )
+
+
+# --- body links (milestone 3) ------------------------------------------------
+
+OPENNESS_HTML = (Path(__file__).parent / "fixtures" / "html" / "openness_page.html").read_text("utf-8")
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+def test_read_page_body_links(catalog, fake_tia, reference_format):
+    fake_tia.contents[("tia2", "tia2-p1")] = OPENNESS_HTML
+    out = read_page(catalog, "tia:tia2/tia2-p1", reference_format=reference_format)
+    topic = "tia:tia1/topic-a" if reference_format == "compact" else f"https://{TIA_HOST}/r/tia1/topic-a"
+    assert f"]({topic})" in out
+    assert f"https://{TIA_HOST}/r/tia1/topic-b?section=" in out
+    assert "support.industry.siemens.com" in out
+    assert "viewer/attachment" not in out and "api/khub" not in out

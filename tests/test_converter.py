@@ -94,3 +94,32 @@ def test_soup_path_matches_string_path(case) -> None:
     soup = BeautifulSoup(entry["html"], "html.parser")
     _clean_soup(soup)
     assert html_to_markdown(soup, entry["title"]) == html_to_markdown(_clean_html(entry["html"]), entry["title"])
+
+
+def test_link_hook_and_images_off() -> None:
+    html = (
+        '<p><a href="A">one</a> <a href="B">two</a> <a href="C"><img alt="" src="i.png"></a>'
+        ' <img alt="Diagram" src="d.png"></p>'
+    )
+    md = html_to_markdown(html, "T", link=lambda h: {"A": "tia:m/a", "B": None}.get(h, h), images=False)
+    assert "[one](tia:m/a) two" in md and "Diagram" in md
+    assert "i.png" not in md and "d.png" not in md and "](C)" not in md
+
+
+def test_image_inside_link_keeps_alt_as_label() -> None:
+    md = html_to_markdown('<p><a href="A"><img alt="Wiring" src="w.png"></a></p>', "T", images=False)
+    assert "[Wiring](A)" in md and "w.png" not in md
+
+
+def test_link_hook_in_lists_and_tables() -> None:
+    html = '<ul><li><a href="A">item</a></li></ul><table><tr><td><a href="A">cell</a></td></tr></table>'
+    md = html_to_markdown(html, "T", link=lambda h: "tia:m/a")
+    assert md.count("(tia:m/a)") == 2 and "(A)" not in md
+
+
+def test_link_hook_reaches_markdownify_fallback() -> None:
+    md = html_to_markdown(
+        '<dl><dt><a href="A">term</a> <img alt="pic" src="p.png"></dt><dd>d</dd></dl>', "T",
+        link=lambda h: "tia:m/a", images=False,
+    )
+    assert "tia:m/a" in md and "(A)" not in md and "p.png" not in md and "pic" in md

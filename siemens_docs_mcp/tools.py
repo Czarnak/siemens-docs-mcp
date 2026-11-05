@@ -16,7 +16,7 @@ from siemens_docs_mcp.catalog import (
 )
 from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
 from siemens_docs_mcp.content import fetch_soup
-from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.converter import LinkRewrite, html_to_markdown
 from siemens_docs_mcp.rendering import (
     SearchHit,
     render_page,
@@ -54,6 +54,18 @@ def _search_reference(catalog: Catalog, host: str, topic: dict, reference_format
                 return compact
             return catalog.fallback_reader_url(topic.get("readerUrl")) or catalog.id_url(target)
     return catalog.fallback_reader_url(topic.get("readerUrl")) or "(reference unavailable)"
+
+
+def _body_link(catalog: Catalog, reference_format: ReferenceFormat) -> LinkRewrite:
+    """Page-body link policy: drop attachment URLs; topic links follow reference_format."""
+    def rewrite(href: str) -> str | None:
+        if catalog.is_attachment_link(href):
+            return None
+        if reference_format == "compact":
+            return catalog.compact_link(href) or href
+        return href
+
+    return rewrite
 
 
 def _normalize_hit(topic: dict, reference: str) -> SearchHit:
@@ -295,7 +307,7 @@ def read_page(
         source = catalog.compact_ref(target) if reference_format == "compact" else catalog.id_url(target)
         titles = [info.title]
     soup = fetch_soup(catalog.client(res.host), res.map_id, content_id)
-    body = html_to_markdown(soup or "", title)
+    body = html_to_markdown(soup or "", title, link=_body_link(catalog, reference_format), images=False)
     if offset >= len(body) > 0:
         raise ValueError(f"offset {offset} is past the end of this page (length {len(body)}).")
     end = offset + max_chars
