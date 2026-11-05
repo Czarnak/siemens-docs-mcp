@@ -114,3 +114,27 @@ async def test_invalid_format_rejected_before_fetch(server, fake_tia, fake_iox):
     for fake in (fake_tia, fake_iox):
         assert fake.list_maps_calls == 0
         assert fake.search_calls == fake.get_pages_calls == fake.get_content_calls == []
+
+
+@pytest.mark.anyio
+async def test_search_scope_selects_host_and_locale(server, fake_tia, fake_iox):
+    """Without scope the default host (tia) would be searched; the scope must win."""
+    from tests.conftest import make_hit, make_search_response
+
+    fake_iox.search_response = make_search_response([make_hit(map_id="iox1", content_id="iox1-p1")])
+    empty = {"host": "", "product": "", "version": "", "locale": ""}
+    async with Client(server) as client:
+        result = await client.call_tool("search_docs", {"query": "x", "scope": "iox:iox1", **empty})
+    assert not result.is_error, result.content[0].text
+    assert fake_tia.search_calls == []
+    assert fake_iox.search_calls[0]["filters"] == [{"key": "ft:publicationId", "values": ["iox1"]}]
+    assert fake_iox.search_calls[0]["locale"] == "en-US"
+    assert "iox:iox1/iox1-p1" in result.content[0].text
+
+
+@pytest.mark.anyio
+async def test_search_scope_conflict_is_tool_error(server, fake_tia):
+    async with Client(server) as client:
+        result = await client.call_tool("search_docs", {"query": "x", "scope": "iox:iox1", "host": "docs.tia.siemens.cloud"})
+    assert result.is_error
+    assert "host" in result.content[0].text

@@ -1,7 +1,7 @@
 # Scoped search: milestone 2 design
 
 Date: 2026-11-05
-Status: draft for user review.
+Status: approved by the user on 2026-11-05; implemented on branch `claude/nifty-hawking-9rsygl`.
 Roadmap: [LLM efficiency roadmap](../plans/2026-11-01-llm-efficiency-roadmap.md), point 2.
 
 ## Intent
