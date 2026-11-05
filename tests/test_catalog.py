@@ -411,3 +411,46 @@ def test_concurrent_cold_loads_happen_once(fake_tia, fake_iox):
         t.join()
     assert created == [TIA_HOST]
     assert fake_tia.list_maps_calls == 1
+
+
+# --- body-link classification (no network) ---------------------------------
+
+def test_compact_link_rewrites_known_map_without_fetching(catalog, fake_tia):
+    catalog.maps(TIA_HOST)
+    calls = fake_tia.list_maps_calls
+    assert catalog.compact_link(f"https://{TIA_HOST}/r/tia1/topic-a") == "tia:tia1/topic-a"
+    assert catalog.compact_link(f"https://{TIA_HOST}/r/tia1") == "tia:tia1"
+    assert fake_tia.list_maps_calls == calls
+
+
+@pytest.mark.parametrize("url", [
+    f"https://{TIA_HOST}/r/tia1/topic-b?section=",
+    f"https://{TIA_HOST}/r/tia1/topic-b#s1",
+    f"https://{TIA_HOST}/r/en-us/v21/doc/chapter-1",
+    f"https://{TIA_HOST}/r/unknown/x",
+    f"https://{TIA_HOST}/r/tia1/..",
+    "https://support.industry.siemens.com/cs/us/en/view/1",
+    "/r/tia1/x",
+    "mailto:someone@example.com",
+])
+def test_compact_link_leaves_others(catalog, url):
+    catalog.maps(TIA_HOST)
+    assert catalog.compact_link(url) is None
+
+
+def test_compact_link_needs_loaded_maps(catalog, fake_iox):
+    assert catalog.compact_link(f"https://{IOX_HOST}/r/iox1/iox1-p1") is None
+    assert fake_iox.list_maps_calls == 0
+
+
+def test_compact_link_ignores_stale_maps(catalog_with_clock):
+    catalog_with_clock.maps(TIA_HOST)
+    catalog_with_clock.clock_value += 86401
+    assert catalog_with_clock.compact_link(f"https://{TIA_HOST}/r/tia1/topic-a") is None
+
+
+def test_is_attachment_link(catalog):
+    assert catalog.is_attachment_link(f"https://{TIA_HOST}/viewer/attachment/m/r")
+    assert catalog.is_attachment_link(f"https://{TIA_HOST}/api/khub/maps/m/resources/r/content?v=1")
+    assert not catalog.is_attachment_link(f"https://{TIA_HOST}/r/tia1/x")
+    assert not catalog.is_attachment_link("https://example.com/viewer/attachment/m/r")

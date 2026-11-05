@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 import pytest
 
 from siemens_docs_mcp.catalog import CatalogError, Resolved
@@ -146,14 +149,22 @@ def test_read_page_map_root_reads_root_topic(catalog, fake_tia):
     assert "# STEP 7 Basic" in out and "Welcome" in out
 
 
+def _body(out: str) -> str:
+    """read_page output without the provenance header and continuation line."""
+    body = out.split("\n\n", 1)[1]
+    return re.sub(r"\n\n\[truncated — call again with [^\]]*\]$", "", body)
+
+
 def test_read_page_truncates_with_offset_hint(catalog, fake_tia):
     fake_tia.contents[("tia2", "tia2-p1")] = "<p>" + "abcdefghij " * 400 + "</p>"
+    whole = read_page(catalog, P1_URL)
     first = read_page(catalog, P1_URL, max_chars=1000)
-    assert first.endswith("[truncated — call again with offset=1000]")
-    second = read_page(catalog, P1_URL, offset=1000, max_chars=1000)
-    assert "offset=2000" in second
-    body = first.split("\n\n", 1)[1]
-    assert "offset=1000" in body
+    offset = int(re.search(r"\[truncated — call again with offset=(\d+)\]$", first).group(1))
+    assert 900 < offset <= 1000 and len(_body(first)) <= 1000
+    second = read_page(catalog, P1_URL, offset=offset, max_chars=1000)
+    assert "offset=" in second
+    assert _body(whole).startswith(_body(first))
+    assert _body(whole)[offset:].startswith(_body(second))
 
 
 def test_read_page_last_chunk_has_no_footer(catalog, fake_tia):
@@ -395,3 +406,134 @@ def test_toc_alias_canonical_source(catalog, reference_format, alias, canonical,
     assert get_toc(catalog, alias, reference_format=reference_format) == get_toc(
         catalog, canonical, reference_format=reference_format,
     )
+
+
+# --- body links (milestone 3) ------------------------------------------------
+
+OPENNESS_HTML = (Path(__file__).parent / "fixtures" / "html" / "openness_page.html").read_text("utf-8")
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+def test_read_page_body_links(catalog, fake_tia, reference_format):
+    fake_tia.contents[("tia2", "tia2-p1")] = OPENNESS_HTML
+    out = read_page(catalog, "tia:tia2/tia2-p1", reference_format=reference_format)
+    topic = "tia:tia1/topic-a" if reference_format == "compact" else f"https://{TIA_HOST}/r/tia1/topic-a"
+    assert f"]({topic})" in out
+    assert f"https://{TIA_HOST}/r/tia1/topic-b?section=" in out
+    assert "support.industry.siemens.com" in out
+    assert "viewer/attachment" not in out and "api/khub" not in out
+
+
+# --- reading modes (milestone 3) --------------------------------------------
+
+def test_read_page_outline(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = OPENNESS_HTML
+    out = read_page(catalog, "tia:tia2/tia2-p1", mode="outline")
+    assert "\n\nOutline (5 sections, " in out
+    assert "\n2. ## Program code: Compiling a technology object — " in out and ", 1 code block\n" in out
+    assert "truncated" not in out
+
+
+def test_read_page_section_and_code(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = OPENNESS_HTML
+    sec = read_page(catalog, "tia:tia2/tia2-p1", section="Program code")
+    assert "## Program code: Compiling the technology object group" in sec
+    assert "## Requirement" not in sec and "# Page 1" not in sec and "Compile results" not in sec
+    code = read_page(catalog, "tia:tia2/tia2-p1", section="2", mode="code")
+    assert "## Program code: Compiling a technology object\n\n```" in code and "group" not in code
+    assert code == read_page(catalog, "tia:tia2/tia2-p1", section=2, mode="code")
+
+
+def test_read_page_code_mode_whole_page(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = OPENNESS_HTML
+    out = read_page(catalog, "tia:tia2/tia2-p1", mode="code")
+    assert out.count("```") == 4 and "Requirement" not in out and "Compile results" not in out
+
+
+def test_read_page_no_code_notes(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = '<p class="Blocktitle">Intro</p><p>Prose only.</p>'
+    assert read_page(catalog, P1_URL, mode="code").endswith("\n\nNo code blocks on this page.")
+    assert read_page(catalog, P1_URL, mode="code", section="Intro").endswith(
+        "\n\nNo code blocks in the selected sections."
+    )
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"mode": "outline", "section": "x"}, {"mode": "outline", "offset": 5}, {"mode": "summary"}, {"section": -1},
+])
+def test_read_page_argument_errors_fetch_nothing(catalog, fake_tia, kwargs):
+    with pytest.raises(ValueError):
+        read_page(catalog, "tia:tia2/tia2-p1", **kwargs)
+    assert fake_tia.get_content_calls == []
+    assert fake_tia.list_maps_calls == 0
+
+
+def test_read_page_unknown_mode_names_allowed_values(catalog):
+    with pytest.raises(ValueError, match="full, outline, code"):
+        read_page(catalog, "tia:tia2/tia2-p1", mode="summary")
+
+
+def test_read_page_empty_string_args_are_unset(catalog):
+    assert read_page(catalog, P1_URL, section="", mode="") == read_page(catalog, P1_URL)
+
+
+def test_read_page_empty_page_modes(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = " "
+    assert read_page(catalog, P1_URL, mode="outline").endswith("\n\nThis page has no content.")
+    assert read_page(catalog, P1_URL, mode="code").endswith("\n\nNo code blocks on this page.")
+    with pytest.raises(ValueError, match="no headings"):
+        read_page(catalog, P1_URL, section="x")
+
+
+def test_read_page_tags_only_page_is_empty(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = "<div><span></span></div>"
+    assert read_page(catalog, P1_URL).endswith("# Page 1\n\n*No content available.*\n")
+
+
+def test_read_page_section_hint_repeats_arguments(catalog, fake_tia):
+    code = "".join(f'<p class="p_table_l_code">line {i}</p>' for i in range(400))
+    fake_tia.contents[("tia2", "tia2-p1")] = (
+        f'<p class="Blocktitle">Program code</p><table class="table_sourcecode"><tr><td>{code}</td></tr></table>'
+    )
+    out = read_page(catalog, P1_URL, section="Program code", mode="code", max_chars=1000)
+    match = re.search(r'\[truncated — call again with section="Program code", mode="code", offset=(\d+)\]$', out)
+    assert match
+    nxt = read_page(catalog, P1_URL, section="Program code", mode="code", max_chars=1000, offset=int(match.group(1)))
+    assert _body(nxt).startswith("```\nline ")
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+@pytest.mark.parametrize("href", ["http://[IP address of the CPU]/", "http://[bad", "https://a]b/r/x"])
+def test_read_page_survives_malformed_body_links(catalog, fake_tia, reference_format, href):
+    fake_tia.contents[("tia2", "tia2-p1")] = f'<p>Open <a href="{href}">the web server</a>.</p>'
+    out = read_page(catalog, P1_URL, reference_format=reference_format)
+    assert f"[the web server]({href})" in out
+
+
+def test_read_page_attachment_link_keeps_label(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = (
+        f'<p>Get the <a href="https://{TIA_HOST}/viewer/attachment/tia1/gsd">Download GSD</a> file.</p>'
+    )
+    out = read_page(catalog, P1_URL)
+    assert "Get the Download GSD file." in out and "viewer/attachment" not in out
+
+
+def test_url_format_hint_keeps_the_same_view(catalog, fake_tia):
+    paras = "".join(f'<p>Para {i:02d} see <a href="https://{TIA_HOST}/r/tia1/t{i}">topic</a>.</p>' for i in range(40))
+    fake_tia.contents[("tia2", "tia2-p1")] = paras
+    first = read_page(catalog, P1_URL, reference_format="url", max_chars=1000)
+    hint = re.search(r"\[truncated — call again with (.*)\]$", first).group(1)
+    assert 'reference_format="url"' in hint
+    offset = int(re.search(r"offset=(\d+)", hint).group(1))
+    second = read_page(catalog, P1_URL, reference_format="url", max_chars=1000, offset=offset)
+    last_first = re.findall(r"Para (\d+)", _body(first))[-1]
+    first_second = re.findall(r"Para (\d+)", _body(second))[0]
+    assert int(first_second) == int(last_first) + 1
+
+
+def test_cross_host_links_do_not_depend_on_cache(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = f'<p>See <a href="https://{IOX_HOST}/r/iox1/iox1-p1">intro</a>.</p>'
+    before = read_page(catalog, P1_URL)
+    catalog.maps(IOX_HOST)
+    assert read_page(catalog, P1_URL) == before
+    assert f"](https://{IOX_HOST}/r/iox1/iox1-p1)" in before

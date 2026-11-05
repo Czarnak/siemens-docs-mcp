@@ -1,10 +1,12 @@
 """Pure Markdown rendering of prepared documentation results."""
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from siemens_docs_mcp.catalog import MapInfo
+from siemens_docs_mcp.reading import OutlineRow, ReadMode
 
 
 @dataclass(frozen=True)
@@ -101,3 +103,28 @@ def render_toc(rows: Sequence[tuple[int, str, str]], truncated: bool, limit: int
     if truncated:
         lines.append(f"… truncated at {limit} lines — use a deeper reference or a smaller depth.")
     return "\n".join(lines)
+
+
+def render_outline(total_chars: int, rows: Sequence[OutlineRow]) -> str:
+    if not rows:
+        return "This page has no content."
+    lines = [f"Outline ({len(rows)} sections, {total_chars:,} chars):"]
+    for row in rows:
+        code = "" if not row.code_blocks else f", {row.code_blocks} code block{'s' if row.code_blocks > 1 else ''}"
+        lines.append(f"{row.number}. {row.label} — {row.chars:,} chars{code}")
+    return "\n".join(lines)
+
+
+def render_continuation(
+    next_offset: int, section: int | str | None, mode: ReadMode, reference_format: str = "compact"
+) -> str:
+    """The exact arguments that return the next chunk of the same view (offsets depend on all of them)."""
+    args = []
+    if section is not None:
+        args.append(f"section={json.dumps(section, ensure_ascii=False)}")
+    if mode != "full":
+        args.append(f'mode="{mode}"')
+    if reference_format != "compact":
+        args.append(f'reference_format="{reference_format}"')
+    args.append(f"offset={next_offset}")
+    return f"[truncated — call again with {', '.join(args)}]"

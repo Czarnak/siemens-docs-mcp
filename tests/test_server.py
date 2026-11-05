@@ -150,3 +150,23 @@ async def test_search_scope_uses_publication_locale_not_server_default(server, f
         result = await client.call_tool("search_docs", {"query": "x", "scope": "tia:tia5"})
     assert not result.is_error, result.content[0].text
     assert fake_tia.search_calls[0]["locale"] == "de-DE"
+
+
+@pytest.mark.anyio
+async def test_read_page_reading_mode_schema(server, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = (
+        '<p class="Blocktitle">A</p><p>a</p><p class="Blocktitle">B</p><pre>b()</pre>'
+    )
+    async with Client(server) as client:
+        tools = {t.name: t for t in (await client.list_tools()).tools}
+        properties = tools["read_page"].input_schema["properties"]
+        assert properties["mode"]["enum"] == ["full", "outline", "code"]
+        assert properties["mode"]["default"] == "full"
+        assert {option.get("type") for option in properties["section"]["anyOf"]} >= {"integer", "string"}
+        as_int = await client.call_tool("read_page", {"url": "tia:tia2/tia2-p1", "section": 2})
+        as_str = await client.call_tool("read_page", {"url": "tia:tia2/tia2-p1", "section": "2"})
+        outline = await client.call_tool("read_page", {"url": "tia:tia2/tia2-p1", "mode": "outline"})
+    assert not as_int.is_error and as_int.content[0].text == as_str.content[0].text
+    assert "## B" in as_int.content[0].text and "## A" not in as_int.content[0].text
+    assert "Outline (2 sections" in outline.content[0].text
+    assert "outline" in (tools["read_page"].description or "")

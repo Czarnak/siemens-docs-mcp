@@ -1,4 +1,5 @@
 """Live discovery and fixed-target measurements. Run with: pytest -m live -s"""
+import contextlib
 import hashlib
 import json
 import re
@@ -212,3 +213,53 @@ def test_scoped_search_stays_in_scope(host):
             "chapter_header": in_chapter.splitlines()[0],
             "chars": {"unscoped_10": len(unscoped), "chapter_10": len(in_chapter)},
         }, ensure_ascii=False))
+
+
+READING_MANIFEST = Path(__file__).with_name("fixtures") / "reading_live_targets.json"
+
+
+@pytest.mark.live
+def test_reading_measurements():
+    """Print read_page sizes for fixed pages, one catalog/client per host."""
+    pages = json.loads(READING_MANIFEST.read_text(encoding="utf-8"))["pages"]
+    clients = {host: FluidtopicsClient(host, DEFAULT_MIN_INTERVAL) for host in DEFAULT_HOSTS}
+    cat = Catalog(list(DEFAULT_HOSTS), lambda h: clients[h])
+    with contextlib.ExitStack() as stack:
+        for client in clients.values():
+            stack.enter_context(client)
+        for page in pages:
+            def measure(mode_label, page=page, **kwargs):
+                try:
+                    output = tools.read_page(cat, page["url"], **kwargs)
+                except ValueError as exc:  # e.g. no "Program code" heading on this page
+                    print("MEASUREMENT " + json.dumps({"label": page["label"], "mode": mode_label, "error": str(exc)[:200]}))
+                    return None
+                assert "> Source:" in output
+                print("MEASUREMENT " + json.dumps({
+                    "label": page["label"], "mode": mode_label, "format": kwargs.get("reference_format", "compact"),
+                    "chars": len(output), "min_interval": DEFAULT_MIN_INTERVAL,
+                }))
+                return output
+
+            full = measure("full", reference_format="compact")
+            measure("full", reference_format="url")
+            measure("outline", mode="outline")
+            measure("section:Program code", section="Program code")
+            measure("code", mode="code")
+
+            # Every compact topic link in a body must read as a page.
+            links = sorted(set(re.findall(r"\]\(((?:tia|iox):[\w~.-]+(?:/[\w~.-]+)?)\)", full.split("\n\n", 1)[1])))
+            for link in links:
+                assert "> Source:" in tools.read_page(cat, link, mode="outline"), link
+            assert "viewer/attachment" not in full and "/api/khub/" not in full
+
+            # Page through with the smallest budget: no chunk may break a code fence.
+            offset, chunks = 0, 0
+            while offset is not None:
+                chunk = tools.read_page(cat, page["url"], offset=offset, max_chars=1000)
+                body = chunk.split("\n\n", 1)[1]
+                assert sum(line.strip() == "```" for line in body.split("\n")) % 2 == 0, (page["label"], offset)
+                match = re.search(r"offset=(\d+)\]$", chunk)
+                offset = int(match.group(1)) if match else None
+                chunks += 1
+            print("PAGED " + json.dumps({"label": page["label"], "links_checked": len(links), "chunks_at_1000": chunks}))

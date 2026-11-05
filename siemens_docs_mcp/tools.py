@@ -15,10 +15,21 @@ from siemens_docs_mcp.catalog import (
     validate_reference_format,
 )
 from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
-from siemens_docs_mcp.content import fetch_html
-from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.content import fetch_soup
+from siemens_docs_mcp.converter import Block, LinkRewrite, html_to_blocks
+from siemens_docs_mcp.reading import (
+    READ_MODES,
+    ReadMode,
+    chunk_view,
+    code_view,
+    outline_rows,
+    select_sections,
+    view_text,
+)
 from siemens_docs_mcp.rendering import (
     SearchHit,
+    render_continuation,
+    render_outline,
     render_page,
     render_publications,
     render_scoped_search,
@@ -54,6 +65,22 @@ def _search_reference(catalog: Catalog, host: str, topic: dict, reference_format
                 return compact
             return catalog.fallback_reader_url(topic.get("readerUrl")) or catalog.id_url(target)
     return catalog.fallback_reader_url(topic.get("readerUrl")) or "(reference unavailable)"
+
+
+def _body_link(catalog: Catalog, reference_format: ReferenceFormat, host: str) -> LinkRewrite:
+    """Page-body link policy: drop attachment URLs; topic links on the page's own host follow reference_format.
+
+    Links to other hosts stay unchanged: whether their publication list is loaded depends on earlier calls,
+    and the same page must always render the same text, or offsets from a previous call would drift.
+    """
+    def rewrite(href: str) -> str | None:
+        if catalog.is_attachment_link(href):
+            return None
+        if reference_format == "compact":
+            return catalog.compact_link(href, host=host) or href
+        return href
+
+    return rewrite
 
 
 def _normalize_hit(topic: dict, reference: str) -> SearchHit:
@@ -263,16 +290,38 @@ def list_publications(
     return render_publications(host, rows, len(maps), MAX_PUBLICATIONS)
 
 
-def read_page(
-    catalog: Catalog, url: str, offset: int = 0, max_chars: int = 20000,
-    *, reference_format: ReferenceFormat = "compact",
-) -> str:
-    """Read one topic as Markdown with a provenance header; page through it with ``offset``."""
-    validate_reference_format(reference_format)
+def _reading_args(
+    offset: int, max_chars: int, section: int | str | None, mode: str | None
+) -> tuple[int | str | None, ReadMode]:
+    """Validate read_page arguments before any request; returns (section, mode) normalized."""
     if offset < 0:
         raise ValueError(f"offset must be >= 0, got {offset}")
     if not MIN_CHARS <= max_chars <= MAX_CHARS:
         raise ValueError(f"max_chars must be {MIN_CHARS}-{MAX_CHARS}, got {max_chars}")
+    mode = mode or "full"  # LLM clients send "" for unset optional params
+    if mode not in READ_MODES:
+        raise ValueError(f"mode must be one of: {', '.join(READ_MODES)}; got {mode!r}")
+    if isinstance(section, str):
+        section = section.strip()
+        section = int(section) if section.isdigit() else (section or None)
+    if isinstance(section, bool) or (isinstance(section, int) and section < 0):
+        raise ValueError(f"section must be an outline number (0 or more) or heading text, got {section!r}")
+    if mode == "outline" and (section is not None or offset > 0):
+        raise ValueError("mode='outline' takes neither section nor offset; it lists the whole page.")
+    return section, mode
+
+
+def read_page(
+    catalog: Catalog, url: str, offset: int = 0, max_chars: int = 20000,
+    *, reference_format: ReferenceFormat = "compact", section: int | str | None = None, mode: ReadMode = "full",
+) -> str:
+    """Read one topic as Markdown with a provenance header: the whole page, an outline, sections or code only.
+
+    Long views are returned in chunks cut between blocks; the continuation line gives the exact arguments
+    for the next chunk.
+    """
+    validate_reference_format(reference_format)
+    section, mode = _reading_args(offset, max_chars, section, mode)
     res = catalog.resolve(url)
     try:
         info = catalog.maps(res.host)[res.map_id]
@@ -294,15 +343,22 @@ def read_page(
         target = Resolved(res.host, res.map_id, content_id)
         source = catalog.compact_ref(target) if reference_format == "compact" else catalog.id_url(target)
         titles = [info.title]
-    html = fetch_html(catalog.client(res.host), res.map_id, content_id)
-    body = html_to_markdown(html, title)
-    if offset >= len(body) > 0:
-        raise ValueError(f"offset {offset} is past the end of this page (length {len(body)}).")
-    end = offset + max_chars
-    chunk = body[offset:end]
-    if end < len(body):
-        chunk += f"\n\n[truncated — call again with offset={end}]"
-    return render_page(info, titles, source, chunk)
+    soup = fetch_soup(catalog.client(res.host), res.map_id, content_id)
+    body = html_to_blocks(soup, link=_body_link(catalog, reference_format, res.host), images=False) if soup else []
+    full = [Block("heading", f"# {title}", 1), *(body or [Block("paragraph", "*No content available.*")])]
+    if mode == "outline":
+        return render_page(info, titles, source, render_outline(len(view_text(full)), outline_rows(body)))
+    view = full if section is None else select_sections(body, section)
+    if mode == "code":
+        view = code_view(body if section is None else view)
+        if not view:
+            note = "No code blocks on this page." if section is None else "No code blocks in the selected sections."
+            return render_page(info, titles, source, note)
+    chunk = chunk_view(view, offset, max_chars)
+    text = chunk.text
+    if chunk.next_offset is not None:
+        text += "\n\n" + render_continuation(chunk.next_offset, section, mode, reference_format)
+    return render_page(info, titles, source, text)
 
 
 def get_toc(catalog: Catalog, url: str, depth: int = 2, *, reference_format: ReferenceFormat = "compact") -> str:

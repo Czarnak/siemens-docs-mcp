@@ -1,0 +1,9 @@
+{
+  "pages": [
+    {"label": "tia_installing_openness", "url": "https://docs.tia.siemens.cloud/r/en-us/v20/tia-portal-openness-api-for-automation-of-engineering-workflows/basics/installation/installing-tia-portal-openness"},
+    {"label": "tia_compiling_a_project", "url": "tia:Rc0LxW522mLHDCX_sejL~A/DwXLzDT2glAOnCAxC4jvtA"},
+    {"label": "tia_export_import_sub_modules", "url": "tia:Rc0LxW522mLHDCX_sejL~A/QgQDMcE63ZVgzT2JBFmI2g"},
+    {"label": "iox_loading_opc_ua_model", "url": "https://docs.industrial-operations-x.siemens.cloud/r/en-us/v2.7/industrial-information-hub/manage-data/setting-up-opc-ua-models/loading-the-opc-ua-model-via-opc-ua-server"},
+    {"label": "iox_browse_hierarchy_members", "url": "iox:Li4yDQJF3SPIB5lKtTioBA/yLboMYCt0B4VMWwA3ohbvw"}
+  ]
+}

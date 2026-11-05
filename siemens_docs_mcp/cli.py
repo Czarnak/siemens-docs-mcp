@@ -33,7 +33,7 @@ import yaml
 
 from siemens_docs_mcp.catalog import Catalog
 from siemens_docs_mcp.client import FluidtopicsClient
-from siemens_docs_mcp.content import fetch_html
+from siemens_docs_mcp.content import fetch_soup
 from siemens_docs_mcp.converter import html_to_markdown
 from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
 from siemens_docs_mcp.writer import resolve_output_paths, write_page
@@ -136,8 +136,8 @@ def run(config: dict, dry_run: bool = False, output_override: str | None = None,
         for i, (page, out_path) in enumerate(targets, start=1):
             log.info("[%d/%d] %s", i, len(targets), page.title)
             try:
-                html = fetch_html(client, map_id, page.content_id)
-                markdown = html_to_markdown(html, page.title)
+                soup = fetch_soup(client, map_id, page.content_id)
+                markdown = html_to_markdown(soup or "", page.title)
                 write_page(out_path, markdown)
             except Exception as exc:  # noqa: BLE001
                 log.error("  ✗ Failed: %s", exc)

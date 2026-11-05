@@ -1,0 +1,102 @@
+{
+ "file_tia_scl": {
+  "html": "<div class=\"content-locale-en-US content-locale-en\"><meta content=\"$COMPONENT=STEP 7\" name=\"Siemens.TIAHelp.HelpComponent\"/><meta content=\"en-US\" name=\"Siemens.TIAHelp.Culture\"/><meta content=\"ProgBlockSCLenUS\" name=\"Siemens.TIAHelp.Package\"/><meta content=\"ProgBlockSCLenUS/11628733323/21687778187.htm\" name=\"Siemens.TIAHelp.Id\"/><meta content=\"ProgBlockSCLenUS/11628733323/20605547915.htm\" name=\"Siemens.TIAHelp.TocParentId\"/><meta content=\"100\" name=\"Siemens.TIAHelp.TocOrder\"/><meta content=\"Rules for SCL instructions\" name=\"Siemens.TIAHelp.TocTitle\"/><meta content=\"False\" name=\"Siemens.TIAHelp.IsDefault\"/><meta content=\"False\" name=\"Siemens.TIAHelp.IsChapterPage\"/><meta content=\"SoftwareDocumentation\" name=\"Siemens.TIAHelp.DocumentationScope\"/><meta content=\"Factual Information\" name=\"Siemens.TIAHelp.ImageCategory\"/><meta content=\"Creating SCL programs\" name=\"Siemens.TIAHelp.HelpPackageTitle\"/><meta content=\": Creating SCL programs\" name=\"Siemens.TIAHelp.HelpPackageTitleWithClient\"/><meta content=\"0.14.10\" name=\"Siemens.TIAHelp.HelpConverterVersion\"/><meta content=\"$CLIENT='STEP7' and ($DEVICE='S7-300' or $DEVICE='S7-400' or $DEVICE='S7-1200' or $DEVICE='S7-1500' or $DEVICE='S7-1500T' or $DEVICE='PC')\" name=\"Siemens.TIAHelp.HelpScope\"/><div id=\"nsbanner\">\n<div id=\"titlerowdefault\">\n<table class=\"title\">\n<tbody><tr>\n<td class=\"title\">Rules for SCL instructions</td>\n</tr>\n</tbody></table>\n</div>\n</div><div id=\"nstext\">\n<a id=\"block_1\"></a>\n<p class=\"BlocktitleFirst\">Instructions in SCL     </p>\n<p>SCL recognizes the following types of instructions: </p>\n<ul>\n<li>\n<p>Value assignments</p>\n<p>Value assignments are used to assign a tag a constant value, the result of an expression or the value of another tag. </p>\n</li>\n<li>\n<p>Instructions for program control</p>\n<p>Instructions for program control are used to implement program branches, loops or jumps.</p>\n</li>\n<li>\n<p>Additional instructions from the \"Instructions\" task card</p>\n<p>The \"Instructions\" task card offers a wide selection of standard instructions that you can use in your SCL program.</p>\n</li>\n<li>\n<p>Block calls</p>\n<p>Block calls are used to call up subroutines that have been placed in other blocks and to further process their results.</p>\n</li>\n</ul>\n<a id=\"block_2\"></a>\n<p class=\"Blocktitle\">Rules</p>\n<p>You need to observe the following rules when entering SCL instructions:</p>\n<ul>\n<li>\n<p>Instructions can span several lines.</p>\n</li>\n<li>\n<p>Each instruction ends with a semicolon (;).</p>\n</li>\n<li>\n<p>No distinction is made between upper and lower case.</p>\n</li>\n<li>\n<p>Comments serve only for documentation of the program. They do not affect the program execution.</p>\n</li>\n</ul>\n<a id=\"block_3\"></a>\n<p class=\"Blocktitle\">Examples</p>\n<p>The following examples shows the various types of instructions:</p>\n<p space-before=\"0pt\">\n</p><p class=\"p_table_title\" space-after=\"0pt\"></p>\n<div>\n<table cellpadding=\"0\" cellspacing=\"0\" class=\"table_sourcecode\" id=\"3e44eef4-7c51-4473-ba01-7d78241071c5\" width=\"100%\">\n<colgroup>\n<col width=\"100%\"/>\n</colgroup>\n<thead>\n<tr>\n<th>\n<p class=\"table_sourcecode\">SCL <a class=\"ft-internal-link\" data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.tia.siemens.cloud/r/MKsgSZvSoJDfAK_G3NxYhQ/wqgujtgMEDqqxoEyJXYO7A?section=\" title=\"Copies the following program code to clipboard.\"><img alt=\"Copies the following program code to clipboard.\" src=\"https://docs.tia.siemens.cloud/portal-asset/iconCopy\"/></a></p>\n</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>\n<p class=\"p_table_l_code\">// Example of a value assignment </p>\n<p class=\"p_table_l_code\">\"MyTag\":= 0;</p>\n</td>\n</tr>\n<tr>\n<td>\n<p class=\"p_table_l_code\">// Example of a block call</p>\n<p class=\"p_table_l_code\">\"MyDB\"();</p>\n</td>\n</tr>\n<tr>\n<td>\n<p class=\"p_table_l_code\">// Example of a program control instruction </p>\n<p class=\"p_table_l_code\">WHILE \"Counter\" &lt; 10 DO </p>\n<p class=\"p_table_l_code\">    \"MyTAG\" := \"MyTag\" + 2;</p>\n<p class=\"p_table_l_code\">END_WHILE;</p>\n</td>\n</tr>\n</tbody>\n</table>\n</div>\n<div id=\"nsseealso\">\n<p>\n<b>See also</b>\n</p>\n<p>\n<a class=\"ft-internal-link\" data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.tia.siemens.cloud/r/MKsgSZvSoJDfAK_G3NxYhQ/W2NZ89cHm0pp51Veyuo42Q\">Basics of SCL</a>\n<br/>\n</p>\n</div>\n</div><br/><hr/></div>",
+  "title": "T",
+  "markdown": "# T\n\n| Rules for SCL instructions |\n\n## Instructions in SCL\n\nSCL recognizes the following types of instructions:\n\n- Value assignments\n\n  Value assignments are used to assign a tag a constant value, the result of an expression or the value of another tag.\n- Instructions for program control\n\n  Instructions for program control are used to implement program branches, loops or jumps.\n- Additional instructions from the \"Instructions\" task card\n\n  The \"Instructions\" task card offers a wide selection of standard instructions that you can use in your SCL program.\n- Block calls\n\n  Block calls are used to call up subroutines that have been placed in other blocks and to further process their results.\n\n## Rules\n\nYou need to observe the following rules when entering SCL instructions:\n\n- Instructions can span several lines.\n- Each instruction ends with a semicolon (;).\n- No distinction is made between upper and lower case.\n- Comments serve only for documentation of the program. They do not affect the program execution.\n\n## Examples\n\nThe following examples shows the various types of instructions:\n\n```\n// Example of a value assignment\n\"MyTag\":= 0;\n// Example of a block call\n\"MyDB\"();\n// Example of a program control instruction\nWHILE \"Counter\" < 10 DO\n    \"MyTAG\" := \"MyTag\" + 2;\nEND_WHILE;\n```\n\n**See also**\n\n[Basics of SCL](https://docs.tia.siemens.cloud/r/MKsgSZvSoJDfAK_G3NxYhQ/W2NZ89cHm0pp51Veyuo42Q)\n"
+ },
+ "file_iox_admonition": {
+  "html": "<div class=\"ft_node_extractor content-locale-en-US content-locale-en\">\n<p>The presentation of your ST program data on the PLC's OPC UA Server is controlled by annotating your ST program with the appropriate pragmas. The OPC UA plugin for the ST Compiler (@ax/st-opcua.stc-plugin) validates the <a class=\"ft-internal-link\" data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.industrial-operations-x.siemens.cloud/r/F2~cndjrEaWHpXLkY33djA/wbkXLoGiqUvjbTT_xPM91w\">OPC UA configuration pragmas</a> and generates a corresponding NodeSet XML document during a successful compilation.</p>\n<p>Options that affect the server configuration as a whole are configured with pragma annotations above the <a data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fst-docs&amp;ft:topicTitle=Configuration+declaration\">configuration declaration</a>.</p>\n<p>Options that affect individual variable-mapping nodes are configured with pragma annotations above an individual variable or section of variables:</p>\n<div class=\"highlight\"><pre><span></span><code>{OpcUa.NodeGenerator.IdType = SymbolName} // Use fully-qualified variable names as OPC UA NodeIds\nCONFIGURATION PLC_1\n  VAR_GLOBAL\n    {S7.extern = ReadWrite} // Make var1 Read/Write accessible to the Web API and OPC UA Node Generator\n    {OpcUa.AccessLevel = WriteOnly}  // Create an OPC UA node mapped to var1 with AccessLevel WriteOnly\n    var1:INT;\n  END_VAR\nEND_CONFIGURATION\n</code></pre></div>\n<p>To install the OPC UA server configuration, the user must <a data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fapax&amp;ft:topicTitle=Apax+command-line+reference\">build</a> an annotated ST program and <a data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fsld&amp;ft:topicTitle=load\">load</a> the program onto their PLC.</p>\n<p>The configuration installed using ST Code Annotation will be named <code>Server Interface_1</code>.</p>\n<div class=\"admonition note\">\n<p class=\"admonition-title\">Note</p>\n<p>After building your AX project, the generated NodeSet XML file can be found in the project output directory under <code>opcua/generated.xml</code>.</p>\n</div>\n</div>",
+  "title": "T",
+  "markdown": "# T\n\nThe presentation of your ST program data on the PLC's OPC UA Server is controlled by annotating your ST program with the appropriate pragmas. The OPC UA plugin for the ST Compiler (@ax/st-opcua.stc-plugin) validates the [OPC UA configuration pragmas](https://docs.industrial-operations-x.siemens.cloud/r/F2~cndjrEaWHpXLkY33djA/wbkXLoGiqUvjbTT_xPM91w) and generates a corresponding NodeSet XML document during a successful compilation.\n\nOptions that affect the server configuration as a whole are configured with pragma annotations above the [configuration declaration](https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fst-docs&ft:topicTitle=Configuration+declaration).\n\nOptions that affect individual variable-mapping nodes are configured with pragma annotations above an individual variable or section of variables:\n\n```\n{OpcUa.NodeGenerator.IdType = SymbolName} // Use fully-qualified variable names as OPC UA NodeIds\nCONFIGURATION PLC_1\n  VAR_GLOBAL\n    {S7.extern = ReadWrite} // Make var1 Read/Write accessible to the Web API and OPC UA Node Generator\n    {OpcUa.AccessLevel = WriteOnly}  // Create an OPC UA node mapped to var1 with AccessLevel WriteOnly\n    var1:INT;\n  END_VAR\nEND_CONFIGURATION\n```\n\nTo install the OPC UA server configuration, the user must [build](https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fapax&ft:topicTitle=Apax+command-line+reference) an annotated ST program and [load](https://docs.industrial-operations-x.siemens.cloud/access?ax:packageName=%40ax%2Fsld&ft:topicTitle=load) the program onto their PLC.\n\nThe configuration installed using ST Code Annotation will be named `Server Interface_1`.\n\n> **Note:** After building your AX project, the generated NodeSet XML file can be found in the project output directory under `opcua/generated.xml`.\n"
+ },
+ "file_openness_page": {
+  "html": "<div class=\"content-locale-en-US content-locale-en\">\n<div id=\"nstext\">\n<p>Use the <a class=\"ft-internal-link\" data-ft-click-interceptor=\"ft-internal-link\" href=\"https://docs.tia.siemens.cloud/r/tia1/topic-a\">ICompilable service</a> to compile a technology object.</p>\n<p class=\"BlocktitleFirst\">Requirement</p>\n<p>The TIA Portal Openness application is connected to the TIA Portal. See <a href=\"https://support.industry.siemens.com/cs/us/en/view/109760816\">Siemens Industry Online Support</a>.</p>\n<p class=\"Blocktitle\">Program code: Compiling a technology object</p>\n<table class=\"table_sourcecode\">\n<thead><tr><th><p class=\"table_sourcecode\">C# <a class=\"ft-internal-link\" href=\"https://docs.tia.siemens.cloud/r/tia1/topic-copy?section=\" title=\"Copies the following program code to clipboard.\"><img alt=\"Copies the following program code to clipboard.\" src=\"https://docs.tia.siemens.cloud/portal-asset/iconCopy\"/></a></p></th></tr></thead>\n<tbody><tr><td>\n<p class=\"p_table_l_code\">ICompilable compileService = technologicalObject.GetService&lt;ICompilable&gt;();</p>\n<p class=\"p_table_l_code\">CompilerResult result = compileService.Compile();</p>\n<p class=\"p_table_l_code\">Console.WriteLine(result.State);</p>\n</td></tr></tbody>\n</table>\n<p class=\"Blocktitle\">Program code: Compiling the technology object group</p>\n<table class=\"table_sourcecode\">\n<tbody><tr><td>\n<p class=\"p_table_l_code\">TechnologicalInstanceDBGroup group = plcSoftware.TechnologicalObjectGroup;</p>\n<p class=\"p_table_l_code\">  CompilerResult result = group.GetService&lt;ICompilable&gt;().Compile();</p>\n</td></tr></tbody>\n</table>\n<p><a data-ft-resource-id=\"res-1\" href=\"https://docs.tia.siemens.cloud/viewer/attachment/tia1/res-1\"><img alt=\"\" class=\"ft-zoomable-image\" src=\"https://docs.tia.siemens.cloud/api/khub/maps/tia1/resources/res-1/content?v=1\"/></a></p>\n<div>\n<p class=\"BlocktitleFirst\">Compile results</p>\n<table>\n<tr><th>State</th><th>Meaning</th></tr>\n<tr><td>Success</td><td>No errors or warnings.</td></tr>\n<tr><td>Error</td><td>Compilation failed.</td></tr>\n</table>\n<p>For the result object, see <a href=\"https://docs.tia.siemens.cloud/r/tia1/topic-b?section=\">CompilerResult</a>.</p>\n</div>\n</div>\n</div>\n",
+  "title": "T",
+  "markdown": "# T\n\nUse the [ICompilable service](https://docs.tia.siemens.cloud/r/tia1/topic-a) to compile a technology object.\n\n## Requirement\n\nThe TIA Portal Openness application is connected to the TIA Portal. See [Siemens Industry Online Support](https://support.industry.siemens.com/cs/us/en/view/109760816).\n\n## Program code: Compiling a technology object\n\n```\nICompilable compileService = technologicalObject.GetService<ICompilable>();\nCompilerResult result = compileService.Compile();\nConsole.WriteLine(result.State);\n```\n\n## Program code: Compiling the technology object group\n\n```\nTechnologicalInstanceDBGroup group = plcSoftware.TechnologicalObjectGroup;\n  CompilerResult result = group.GetService<ICompilable>().Compile();\n```\n\n[![](https://docs.tia.siemens.cloud/api/khub/maps/tia1/resources/res-1/content?v=1)](https://docs.tia.siemens.cloud/viewer/attachment/tia1/res-1)\n\n## Compile results\n\n| State | Meaning |\n| --- | --- |\n| Success | No errors or warnings. |\n| Error | Compilation failed. |\n\nFor the result object, see [CompilerResult](https://docs.tia.siemens.cloud/r/tia1/topic-b?section=).\n"
+ },
+ "snippet_code_table": {
+  "html": "<table class=\"table_sourcecode\"><thead><tr><th><p class=\"table_sourcecode\"><a href=\"x\"><img alt=\"Copies the following program code to clipboard.\"></a></p></th></tr></thead><tbody><tr><td>\n  <p class=\"p_table_l_code\">var a = 1;</p>\n  <p class=\"p_table_l_code\">&nbsp;&nbsp;{</p>\n  <p class=\"p_table_l_code\">&nbsp;</p>\n  <p class=\"p_table_l_code\">&nbsp;&nbsp;}</p>\n</td></tr></tbody></table>",
+  "title": "T",
+  "markdown": "# T\n\n```\nvar a = 1;\n  {\n\n  }\n```\n"
+ },
+ "snippet_admonition": {
+  "html": "<div class=\"admonition note\"><p class=\"admonition-title\">Note</p><p>Body text.</p></div>",
+  "title": "T",
+  "markdown": "# T\n\n> **Note:** Body text.\n"
+ },
+ "snippet_list_inline": {
+  "html": "<ul><li><a href=\"https://h/access?ft:baseId=1\">LAD (S7-1200)</a></li><li>Use <b>TON</b> or <code>IEC_TIMER</code> here</li><li><p>First para</p><p>Second <b>para</b></p></li></ul>",
+  "title": "T",
+  "markdown": "# T\n\n- [LAD (S7-1200)](https://h/access?ft:baseId=1)\n- Use **TON** or `IEC_TIMER` here\n- First para\n\n  Second **para**\n"
+ },
+ "snippet_dl_pre": {
+  "html": "<dl><dt>Term</dt><dd>Definition</dd></dl><pre>x = 1\ny = 2</pre>",
+  "title": "T",
+  "markdown": "# T\n\nTerm\n\n:   Definition\n\n```\nx = 1\ny = 2\n```\n"
+ },
+ "snippet_headings": {
+  "html": "<h1>One</h1><h2>Two</h2><h2></h2><h3>Three</h3><h4>Four</h4><h5>Five</h5><h6>Six</h6><p>end</p>",
+  "title": "T",
+  "markdown": "# T\n\n# One\n\n## Two\n\n### Three\n\n#### Four\n\n##### Five\n\n###### Six\n\nend\n"
+ },
+ "snippet_dup_divs": {
+  "html": "<div><div><p>A</p><p>B</p></div><div><p>A</p><p>B</p></div><p>C</p></div>",
+  "title": "T",
+  "markdown": "# T\n\nA\n\nB\n\nC\n"
+ },
+ "snippet_nested_list": {
+  "html": "<ul><li>top<ol><li>one</li><li>two</li></ol></li><li>with note<table class=\"safety\"><tr><td>Note</td><td>Careful here</td></tr></table></li></ul>",
+  "title": "T",
+  "markdown": "# T\n\n- top\n  1. one\n  2. two\n- with note\n> **Note**\n>\n> Careful here\n"
+ },
+ "snippet_safety_note": {
+  "html": "<table class=\"safety\"><tr><td>NOTE</td></tr><tr><td>Mind the gap.</td></tr><tr><td>Second line.</td></tr></table>",
+  "title": "T",
+  "markdown": "# T\n\n> **Note**\n>\n> Mind the gap.\n> Second line.\n"
+ },
+ "snippet_pre_blank_lines": {
+  "html": "<pre>\n\nint a;\n\n\n\nint b;   \n\n</pre>",
+  "title": "T",
+  "markdown": "# T\n\n```\nint a;\n\nint b;\n```\n"
+ },
+ "snippet_images": {
+  "html": "<p>Inline <img alt=\"data\" src=\"data:image/png;base64,AAA=\"> and <img alt=\"Real\" src=\"https://h/x.png\"></p><img alt=\"\" src=\"data:image/png;base64,BBB=\"><img alt=\"Block\" src=\"https://h/y.png\">",
+  "title": "T",
+  "markdown": "# T\n\nInline data and ![Real](https://h/x.png)\n\n![Block](https://h/y.png)\n"
+ },
+ "snippet_dl_link": {
+  "html": "<dl><dt><a href=\"https://docs.tia.siemens.cloud/r/tia1/x\">term</a></dt><dd>def</dd></dl>",
+  "title": "T",
+  "markdown": "# T\n\n[term](https://docs.tia.siemens.cloud/r/tia1/x)\n\n:   def\n"
+ },
+ "snippet_tags_only": {
+  "html": "<div><span></span></div>",
+  "title": "T",
+  "markdown": "# T\n\n\n"
+ },
+ "snippet_regular_table": {
+  "html": "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td></tr><tr><td>x</td><td>y</td><td>z</td></tr></table>",
+  "title": "T",
+  "markdown": "# T\n\n| A | B |  |\n| --- | --- | --- |\n| 1 |  |  |\n| x | y | z |\n"
+ },
+ "snippet_code_paragraphs": {
+  "html": "<p class=\"p_table_l_code\">a = 1;</p><p class=\"table_sourcecode\">b = 2;</p><p class=\"p_table_title\">Table 1</p><p>tail</p>",
+  "title": "T",
+  "markdown": "# T\n\n```\na = 1;\n```\n\n```\nb = 2;\n```\n\ntail\n"
+ },
+ "snippet_empty": {
+  "html": "   ",
+  "title": "T",
+  "markdown": "# T\n\n*No content available.*\n"
+ },
+ "snippet_leading_space_alt": {
+  "html": "<p>A</p><img alt=\"   data alt\" src=\"data:image/png;base64,xx\"><p>B</p>",
+  "title": "T",
+  "markdown": "# T\n\nA\n\n   data alt\n\nB\n"
+ },
+ "snippet_leading_space_first": {
+  "html": "<img alt=\"  first\" src=\"data:image/png;base64,xx\"><p>B</p>",
+  "title": "T",
+  "markdown": "# T\n\nfirst\n\nB\n"
+ }
+}

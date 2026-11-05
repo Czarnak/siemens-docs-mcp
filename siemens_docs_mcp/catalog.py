@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal
-from urllib.parse import unquote, urlsplit
+from urllib.parse import SplitResult, unquote, urlsplit
 
 from siemens_docs_mcp.client import FluidtopicsClient
 from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
@@ -24,6 +24,8 @@ TIA_VERSION_KEY = "tia:SoftwareVersionFilter"
 SW_VERSION_KEY = "SoftwareVersion"
 _VERSION_KEYS = (TIA_VERSION_KEY, SW_VERSION_KEY)
 _CONTENT_ID = re.compile(r"[\w~.-]+")
+# Image and download links in page bodies; their URLs are useless to an agent.
+_ATTACHMENT_PATH = re.compile(r"/viewer/attachment/|/api/khub/maps/[^/]+/resources/")
 _COMPACT_REF = re.compile(r"([\w.-]+):([\w~.-]+)(?:/([\w~.-]+))?")
 
 
@@ -80,6 +82,16 @@ def _map_info(raw: dict) -> MapInfo:
         cluster_id=_first(meta, "ft:clusterId"),
         last_publication=_first(meta, "ft:lastPublication"),
     )
+
+
+def _split_body_url(url: str) -> SplitResult | None:
+    """Parse a page-body href; None for malformed ones (e.g. "http://[IP address of the CPU]/")."""
+    try:
+        parts = urlsplit(url.strip())
+        parts.hostname  # noqa: B018 - may raise for bracketed or invalid hosts
+    except ValueError:
+        return None
+    return parts
 
 
 class Catalog:
@@ -260,6 +272,45 @@ class Catalog:
         prefix, map_id, content_id = match.groups()
         host = self._check_host(HOST_ALIASES.get(prefix.lower(), prefix))
         return Resolved(host, map_id, content_id)
+
+    def _loaded_maps(self, host: str) -> dict[str, MapInfo] | None:
+        """The host's publication list if it is already loaded and fresh; never fetches."""
+        with self._lock:
+            cached = self._maps.get(host)
+            return cached[1] if cached and self._fresh(cached[0]) else None
+
+    def compact_link(self, url: str, host: str | None = None) -> str | None:
+        """Compact reference for a page-body link to ``/r/<mapId>[/<contentId>]``, or None to leave it alone.
+
+        No network: the map id must be in an already-loaded publication list, because a short pretty URL
+        (``/r/foo/bar``) looks exactly like an id URL. Links with a query or fragment are left alone so
+        in-page anchors are not lost. With ``host``, only links to that host are rewritten.
+        """
+        parts = _split_body_url(url)
+        if parts is None:
+            return None
+        link_host = (parts.hostname or "").lower()
+        if (
+            parts.scheme not in ("http", "https") or parts.query or parts.fragment or link_host not in self.hosts
+            or (host is not None and link_host != host.lower())
+        ):
+            return None
+        host = link_host
+        segs = unquote(parts.path).rstrip("/").split("/")[1:]  # ["r", mapId, contentId?]
+        maps = self._loaded_maps(host)
+        if maps is None or len(segs) not in (2, 3) or segs[0] != "r":
+            return None
+        ids = segs[1:]
+        if any(not _CONTENT_ID.fullmatch(i) or i in (".", "..") for i in ids) or ids[0] not in maps:
+            return None
+        return self.compact_ref(Resolved(host, ids[0], ids[1] if len(ids) == 2 else None))
+
+    def is_attachment_link(self, url: str) -> bool:
+        """True for image/attachment URLs on an allowed host."""
+        parts = _split_body_url(url)
+        return parts is not None and (parts.hostname or "").lower() in self.hosts and bool(
+            _ATTACHMENT_PATH.match(parts.path)
+        )
 
     def compact_ref(self, target: Resolved) -> str:
         host = self._check_host(target.host)

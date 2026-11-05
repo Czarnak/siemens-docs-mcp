@@ -50,7 +50,7 @@ Tools:
 | Tool                | Purpose                                                                   |
 |---------------------|---------------------------------------------------------------------------|
 | `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`, or limit to one publication or topic subtree with `scope`). |
-| `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
+| `read_page`         | Read one page as Markdown: outline, sections by heading or number, code only; page through with `offset`. |
 | `get_toc`           | Table of contents of a publication or of the subtree under a topic reference. |
 | `list_publications` | List publications; discover valid `product` / `version` values.           |
 
@@ -64,8 +64,10 @@ also work for the built-in hosts. Prefixes are case-insensitive; IDs retain case
 Pass a compact reference or any reader URL returned by a tool (or copied from the
 browser) in the unchanged `url` argument: `read_page(url="tia:MyPublication/MyTopic")`
 or `get_toc(url="tia:MyPublication")`. Set `reference_format="url"` on any tool to
-emit full reader URLs. Only tool-generated address fields change; page-body links
-remain unchanged. The CLI continues to use reader URLs in its configuration;
+emit full reader URLs. In `read_page` bodies, links to other topics on the same host
+(`https://<host>/r/<mapId>/<contentId>`) become compact references too (or stay full
+URLs with `reference_format="url"`); other links are unchanged, and images keep only
+their alt text. Exported Markdown is not affected. The CLI continues to use reader URLs in its configuration;
 compact references are an MCP tool interface.
 
 To search inside a publication or chapter you already found, pass its reference as
@@ -74,6 +76,15 @@ To search inside a publication or chapter you already found, pass its reference 
 `product`/`version` must be omitted. Publication scope is filtered by the server, so
 its count is exact. Topic scope keeps only hits inside the topic's subtree; it reads at
 most 300 publication results, and says so when its count may be incomplete.
+
+To read only part of a long page, ask for its outline first:
+`read_page(url="tia:MyPublication/MyTopic", mode="outline")` lists numbered headings
+with their sizes. Then pass a number or heading text as `section`:
+`section="Program code"` returns every "Program code" and "Program code: …" section.
+`mode="code"` returns only the code blocks, each under its heading, and combines with
+`section`. Long results are cut between blocks; a code block or table too large for one
+part is split at a line, with its fence or header repeated. Each part ends with the exact
+arguments for the next one.
 
 Environment variables:
 
