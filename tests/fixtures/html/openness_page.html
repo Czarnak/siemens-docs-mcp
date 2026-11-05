@@ -1,0 +1,33 @@
+<div class="content-locale-en-US content-locale-en">
+  <div id="nstext">
+    <p>Use the <a href="https://docs.tia.siemens.cloud/r/tia1/topic-a" class="ft-internal-link" data-ft-click-interceptor="ft-internal-link">ICompilable service</a> to compile a technology object.</p>
+    <p class="BlocktitleFirst">Requirement</p>
+    <p>The TIA Portal Openness application is connected to the TIA Portal. See <a href="https://support.industry.siemens.com/cs/us/en/view/109760816">Siemens Industry Online Support</a>.</p>
+    <p class="Blocktitle">Program code: Compiling a technology object</p>
+    <table class="table_sourcecode">
+      <thead><tr><th><p class="table_sourcecode">C# <a href="https://docs.tia.siemens.cloud/r/tia1/topic-copy?section=" title="Copies the following program code to clipboard." class="ft-internal-link"><img src="https://docs.tia.siemens.cloud/portal-asset/iconCopy" alt="Copies the following program code to clipboard."></a></p></th></tr></thead>
+      <tbody><tr><td>
+        <p class="p_table_l_code">ICompilable compileService = technologicalObject.GetService&lt;ICompilable&gt;();</p>
+        <p class="p_table_l_code">CompilerResult result = compileService.Compile();</p>
+        <p class="p_table_l_code">Console.WriteLine(result.State);</p>
+      </td></tr></tbody>
+    </table>
+    <p class="Blocktitle">Program code: Compiling the technology object group</p>
+    <table class="table_sourcecode">
+      <tbody><tr><td>
+        <p class="p_table_l_code">TechnologicalInstanceDBGroup group = plcSoftware.TechnologicalObjectGroup;</p>
+        <p class="p_table_l_code">&nbsp;&nbsp;CompilerResult result = group.GetService&lt;ICompilable&gt;().Compile();</p>
+      </td></tr></tbody>
+    </table>
+    <p><a href="https://docs.tia.siemens.cloud/viewer/attachment/tia1/res-1" data-ft-resource-id="res-1"><img alt="" class="ft-zoomable-image" src="https://docs.tia.siemens.cloud/api/khub/maps/tia1/resources/res-1/content?v=1"></a></p>
+    <div>
+      <p class="BlocktitleFirst">Compile results</p>
+      <table>
+        <tr><th>State</th><th>Meaning</th></tr>
+        <tr><td>Success</td><td>No errors or warnings.</td></tr>
+        <tr><td>Error</td><td>Compilation failed.</td></tr>
+      </table>
+      <p>For the result object, see <a href="https://docs.tia.siemens.cloud/r/tia1/topic-b?section=">CompilerResult</a>.</p>
+    </div>
+  </div>
+</div>

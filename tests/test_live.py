@@ -1,4 +1,5 @@
 """Live discovery and fixed-target measurements. Run with: pytest -m live -s"""
+import contextlib
 import hashlib
 import json
 import re
@@ -212,3 +213,25 @@ def test_scoped_search_stays_in_scope(host):
             "chapter_header": in_chapter.splitlines()[0],
             "chars": {"unscoped_10": len(unscoped), "chapter_10": len(in_chapter)},
         }, ensure_ascii=False))
+
+
+READING_MANIFEST = Path(__file__).with_name("fixtures") / "reading_live_targets.json"
+
+
+@pytest.mark.live
+def test_reading_measurements():
+    """Print read_page sizes for fixed pages, one catalog/client per host."""
+    pages = json.loads(READING_MANIFEST.read_text(encoding="utf-8"))["pages"]
+    clients = {host: FluidtopicsClient(host, DEFAULT_MIN_INTERVAL) for host in DEFAULT_HOSTS}
+    cat = Catalog(list(DEFAULT_HOSTS), lambda h: clients[h])
+    with contextlib.ExitStack() as stack:
+        for client in clients.values():
+            stack.enter_context(client)
+        for page in pages:
+            for reference_format in ("compact", "url"):
+                output = tools.read_page(cat, page["url"], reference_format=reference_format)
+                assert "> Source:" in output
+                print("MEASUREMENT " + json.dumps({
+                    "label": page["label"], "mode": "full", "format": reference_format, "chars": len(output),
+                    "min_interval": DEFAULT_MIN_INTERVAL,
+                }))
