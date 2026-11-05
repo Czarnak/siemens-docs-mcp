@@ -154,3 +154,137 @@ def code_view(blocks: Sequence[Block]) -> list[Block]:
                 emitted = heading
             out.append(block)
     return out
+
+
+# --- chunking ----------------------------------------------------------------
+
+_FENCE = "```"
+
+
+@dataclass(frozen=True)
+class Chunk:
+    text: str  # ends with "\n" only when it reaches the end of the view
+    next_offset: int | None  # view position of the first character not returned; None when done
+
+
+def _line_starts(text: str) -> list[int]:
+    return [0] + [i + 1 for i, ch in enumerate(text) if ch == "\n"]
+
+
+def _resume_point(text: str, rel: int, max_chars: int, block_kind: str) -> int:
+    """Where to start inside a block that ``rel`` points into.
+
+    A block that fits in one chunk is always read whole. In a larger block, go back to the start of
+    the line, unless that line alone exceeds the budget (then it was split mid-line on purpose).
+    """
+    if len(text) <= max_chars:
+        return 0
+    line_start = text.rfind("\n", 0, rel) + 1
+    line_end = text.find("\n", rel)
+    line_end = len(text) if line_end == -1 else line_end
+    # Same test as _split's "line can never fit": allow for a code piece's two synthetic fence lines.
+    overhead = 2 * len(_FENCE + "\n") if block_kind == "code" else 0
+    return line_start if line_end - line_start + overhead <= max_chars else rel
+
+
+def _split(block: Block, rel: int, budget: int, final_extra: int, max_chars: int) -> tuple[str, int] | None:
+    """The largest valid piece of ``block`` from ``rel`` within ``budget``: (piece, next rel), or None.
+
+    Pieces stay valid Markdown: a code piece is fenced on both ends, a table piece after the header
+    repeats the header. Synthetic fence/header lines count toward the budget but not toward offsets.
+    """
+    text = block.text
+    starts = _line_starts(text)
+    is_code = block.kind == "code" and text.startswith(_FENCE) and len(starts) > 2
+    prefix = ""
+    if is_code and rel > 0:
+        prefix = _FENCE + "\n"
+    elif block.kind == "table" and len(starts) > 3 and rel >= starts[2]:
+        header = text[: starts[2]]
+        next_line_end = text.find("\n", rel)
+        row = text[rel: len(text) if next_line_end == -1 else next_line_end]
+        if len(header) + len(row) <= budget:
+            prefix = header
+    remainder = text[rel:]
+    if len(prefix) + len(remainder) + final_extra <= budget:
+        return prefix + remainder, len(text)
+
+    suffix = "\n" + _FENCE if is_code else ""
+    room = budget - len(prefix) - len(suffix)
+    # Line boundaries after rel; a code piece must hold a content line and leave more than the closing fence.
+    candidates = [b for b in starts if b > rel]
+    if is_code:
+        candidates = [b for b in candidates if b != starts[-1] and (rel > 0 or b >= starts[2])]
+    fitting = [b for b in candidates if (b - 1) - rel <= room]
+    if fitting:
+        cut = fitting[-1]
+        return prefix + text[rel: cut - 1] + suffix, cut
+
+    # No whole line fits. Split inside the line only if the line can never fit in one chunk.
+    line_end = text.find("\n", rel)
+    line_end = len(text) if line_end == -1 else line_end
+    line_start = text.rfind("\n", 0, rel) + 1
+    if line_end - line_start + len(prefix) + len(suffix) <= max_chars or room <= 0:
+        return None
+    space = text.rfind(" ", rel + 1, rel + room + 1)
+    if space != -1:
+        return prefix + text[rel:space] + suffix, space + 1
+    return prefix + text[rel: rel + room] + suffix, rel + room
+
+
+def chunk_view(blocks: Sequence[Block], offset: int, max_chars: int) -> Chunk:
+    """One chunk of the view, from ``offset``, at most ``max_chars``, cut only between blocks.
+
+    A block larger than ``max_chars`` is split at a line (or table row); a single line longer than the
+    budget is split at its last space, and only without one is it cut at the budget.
+    """
+    total = len(view_text(blocks))
+    if offset >= total > 0:
+        raise ValueError(f"offset {offset} is past the end of this page (length {total}).")
+    if not blocks:
+        return Chunk("", None)
+    starts = []
+    pos = 0
+    for block in blocks:
+        starts.append(pos)
+        pos += len(block.text) + 2
+
+    # Locate the start block; an offset in a separator moves to the next block, the final "\n" to the last.
+    index = next(
+        (i for i, b in enumerate(blocks) if offset < starts[i] + len(b.text) + (1 if i == len(blocks) - 1 else 2)),
+        len(blocks) - 1,
+    )
+    rel = max(0, offset - starts[index])
+    if rel >= len(blocks[index].text):  # in the separator after this block
+        index, rel = (index + 1, 0) if index + 1 < len(blocks) else (index, 0)
+    else:
+        rel = _resume_point(blocks[index].text, rel, max_chars, blocks[index].kind)
+
+    parts: list[str] = []
+    used = 0
+    while index < len(blocks):
+        block = blocks[index]
+        sep = 2 if parts else 0
+        final_extra = 1 if index == len(blocks) - 1 else 0
+        if rel == 0 and used + sep + len(block.text) + final_extra <= max_chars:
+            parts.append(block.text)
+            used += sep + len(block.text)
+            index += 1
+            continue
+        if rel == 0 and len(block.text) + final_extra <= max_chars:
+            break  # fits in a chunk of its own: start the next chunk with it
+        piece = _split(block, rel, max_chars - used - sep, final_extra, max_chars)
+        if piece is None:
+            break
+        text, rel = piece
+        parts.append(text)
+        used += sep + len(text)
+        if rel < len(block.text):
+            break
+        index, rel = index + 1, 0
+
+    if not parts:  # cannot happen with max_chars >= 1000; guard against an endless continuation loop
+        raise ValueError(f"max_chars {max_chars} is too small to make progress at offset {offset}.")
+    if index >= len(blocks):
+        return Chunk("\n\n".join(parts) + "\n", None)
+    return Chunk("\n\n".join(parts), starts[index] + rel)

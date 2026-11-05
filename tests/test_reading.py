@@ -3,7 +3,9 @@ import pytest
 
 from siemens_docs_mcp.converter import Block
 from siemens_docs_mcp.reading import (
+    Chunk,
     OutlineRow,
+    chunk_view,
     code_view,
     outline_rows,
     select_sections,
@@ -110,3 +112,108 @@ def test_outline_rows() -> None:
     assert rows[2].chars == len(view_text(split_sections(PAGE)[2].blocks))
     assert outline_rows([p("x")]) == [OutlineRow(0, "(whole page)", 2, 0)]
     assert outline_rows([]) == []
+
+
+# --- chunking ------------------------------------------------------------------
+
+def _all(blocks, max_chars, offset=0):
+    """Every chunk from ``offset`` to the end, following the continuation offsets."""
+    chunks = []
+    while offset is not None:
+        chunk = chunk_view(blocks, offset, max_chars)
+        assert chunk.text and len(chunk.text) <= max_chars, (offset, len(chunk.text))
+        chunks.append(chunk)
+        assert chunk.next_offset is None or chunk.next_offset > offset
+        offset = chunk.next_offset
+    return chunks
+
+
+def _tokens(text):
+    """Content as a token sequence, ignoring whitespace and fence lines the splitter may add."""
+    return " ".join(line for line in text.splitlines() if line.strip() != "```").split()
+
+
+def test_whole_blocks_only():
+    blocks = [p("a" * 600), p("b" * 600)]
+    first = chunk_view(blocks, 0, 1000)
+    assert first.text == "a" * 600 and first.next_offset == 602
+
+
+def test_oversized_code_is_split_with_valid_fences():
+    code = c("```\n" + "\n".join(f"line {i:03d}" for i in range(300)) + "\n```")
+    chunks = _all([code], 1000)
+    assert len(chunks) > 1
+    for chunk in chunks:
+        lines = chunk.text.rstrip("\n").split("\n")
+        assert lines[0] == "```" and lines[-1] == "```" and len(lines) > 2
+    seen = [ln for chunk in chunks for ln in chunk.text.split("\n") if ln.startswith("line ")]
+    assert seen == [f"line {i:03d}" for i in range(300)]
+
+
+def test_table_continuation_repeats_header():
+    rows = "\n".join(f"| r{i} | {'v' * 40} |" for i in range(60))
+    table = Block("table", "| h1 | h2 |\n| --- | --- |\n" + rows)
+    chunks = _all([table], 1000)
+    assert len(chunks) > 1
+    for chunk in chunks:
+        assert chunk.text.startswith("| h1 | h2 |\n| --- | --- |\n| r")
+    seen = [ln for chunk in chunks for ln in chunk.text.split("\n") if ln.startswith("| r")]
+    assert seen == rows.split("\n")
+
+
+def test_long_paragraph_splits_at_space_and_progresses():
+    para = p("word " * 1000)
+    chunks = _all([para], 1000)
+    assert all(not chunk.text.startswith(" ") for chunk in chunks)
+    assert _tokens("".join(chunk.text + " " for chunk in chunks)) == _tokens(para.text)
+
+
+def test_single_spaceless_line_hard_cut():
+    chunk = chunk_view([p("x" * 2500)], 0, 1000)
+    assert chunk.text == "x" * 1000 and chunk.next_offset == 1000
+    assert chunk_view([p("x" * 2500)], 1000, 1000).text == "x" * 1000
+
+
+def test_title_then_huge_paragraph_fills_first_chunk():
+    chunk = chunk_view([h(1, "Page 1"), p("abcdefghij " * 400)], 0, 1000)
+    assert chunk.text.startswith("# Page 1\n\nabcdefghij") and len(chunk.text) > 900
+
+
+def test_offset_mid_block_snaps_back_and_separator_moves_forward():
+    blocks = [p("a" * 300), p("b" * 300)]
+    assert chunk_view(blocks, 450, 1000).text == "b" * 300 + "\n"
+    assert chunk_view(blocks, 301, 1000).text == "b" * 300 + "\n"
+    assert chunk_view(blocks, 150, 1000).text == view_text(blocks)
+
+
+def test_offset_inside_oversized_block_resumes_at_line_start():
+    code = c("```\n" + "\n".join(f"line {i:03d}" for i in range(300)) + "\n```")
+    start = code.text.index("line 150")
+    chunk = chunk_view([code], start + 3, 1000)
+    assert chunk.text.startswith("```\nline 150\n")
+
+
+def test_changed_max_chars_resumes_without_loss():
+    blocks = [p(f"para {i} " + "z" * 200) for i in range(30)]
+    first = chunk_view(blocks, 0, 3000)
+    rest = _all(blocks, 1000, offset=first.next_offset)
+    assert _tokens(first.text + "\n" + "\n".join(r.text for r in rest)) == _tokens(view_text(blocks))
+
+
+def test_concatenation_reproduces_view():
+    blocks = [h(1, "T"), p("x " * 900), c("```\n" + "y\n" * 800 + "```"), p("end")]
+    chunks = _all(blocks, 1000)
+    assert _tokens("\n".join(chunk.text for chunk in chunks)) == _tokens(view_text(blocks))
+    assert chunks[-1].text.endswith("end\n")
+
+
+def test_no_cut_inside_a_code_fence_between_blocks():
+    blocks = [p("intro " * 100), c("```\n" + "k = 1;\n" * 60 + "```"), p("outro")]
+    for chunk in _all(blocks, 1000):
+        assert sum(ln.strip() == "```" for ln in chunk.text.split("\n")) % 2 == 0
+
+
+def test_final_chunk_and_past_end():
+    assert chunk_view([p("short")], 0, 1000) == Chunk("short\n", None)
+    with pytest.raises(ValueError, match="length"):
+        chunk_view([p("short")], 6, 1000)
