@@ -9,8 +9,11 @@ import pytest
 
 from siemens_docs_mcp.catalog import Catalog, MapInfo
 from siemens_docs_mcp.client import FluidtopicsClient
+from siemens_docs_mcp.reading import OutlineRow
 from siemens_docs_mcp.rendering import (
     SearchHit,
+    render_continuation,
+    render_outline,
     render_page,
     render_publications,
     render_search,
@@ -134,3 +137,23 @@ def test_renderer_does_not_access_catalog(monkeypatch):
         assert render_publications("host", [(publication(), "ref")], 1, 50)
         assert render_page(publication(), ["Manual"], "ref", "body")
         assert render_toc([(0, "Manual", "ref")], False, 500)
+
+
+def test_render_outline():
+    rows = [OutlineRow(0, "(before first heading)", 180, 0), OutlineRow(1, "## Program code: A", 2640, 1),
+            OutlineRow(2, "## Program code: B", 720, 2)]
+    assert render_outline(3540, rows) == (
+        "Outline (3 sections, 3,540 chars):\n"
+        "0. (before first heading) — 180 chars\n"
+        "1. ## Program code: A — 2,640 chars, 1 code block\n"
+        "2. ## Program code: B — 720 chars, 2 code blocks"
+    )
+    assert render_outline(0, []) == "This page has no content."
+
+
+def test_render_continuation():
+    assert render_continuation(1000, None, "full") == "[truncated — call again with offset=1000]"
+    assert render_continuation(5, "Program code", "code") == (
+        '[truncated — call again with section="Program code", mode="code", offset=5]'
+    )
+    assert render_continuation(7, 3, "full") == "[truncated — call again with section=3, offset=7]"

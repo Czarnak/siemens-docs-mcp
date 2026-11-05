@@ -43,3 +43,19 @@ seed and sizes as the design's link sample), `min_interval=0.3`.
 | docs.industrial-operations-x.siemens.cloud | 40 | 40 |
 
 Offline: all 18 golden cases are identical through both the string path and the soup path.
+
+## Fixture sizes (Task 7, offline)
+
+`tests/fixtures/html/openness_page.html` read as `tia2-p1` in the test catalog. Ceilings in
+`tests/test_reading_sizes.py` are these values +5%.
+
+| Call | chars |
+| --- | ---: |
+| full, compact | 1039 |
+| full, url | 1115 |
+| `mode="outline"` | 405 |
+| `section="Program code"` | 536 |
+| `mode="code"` | 536 |
+| `mode="code", section="Program code"` | 536 |
+
+The fixture's "Program code" sections hold only code, so section and code views coincide here.

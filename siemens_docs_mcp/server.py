@@ -7,6 +7,7 @@ import os
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Literal
 
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -107,16 +108,26 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
             )
 
     @server.tool(description=(
-        f"""Read one documentation page as Markdown, with a header (publication, version, breadcrumb, source reference).
-        If the page is longer than `max_chars`, the end says how to continue with a larger `offset`.
+        f"""Read one documentation page as Markdown with a header (publication, version, breadcrumb, source
+        reference). mode='outline' lists numbered headings with sizes. `section` takes an outline number or heading
+        text (e.g. 'Program code', which also matches 'Program code: …') and returns only matching sections.
+        mode='code' returns only code blocks under their headings and combines with `section`. Long results end
+        with the exact arguments to continue (`offset`, plus `section`/`mode` when set).
         Links to other topics in a page body follow reference_format; images keep only their alt text.
         {_URL_DOC} {_REFERENCE_DOC} {hosts_doc}"""
     ))
     def read_page(
-        url: str, offset: int = 0, max_chars: int = 20000, reference_format: ReferenceFormat = "compact",
+        url: str,
+        offset: int = 0,
+        max_chars: int = 20000,
+        reference_format: ReferenceFormat = "compact",
+        section: int | str | None = None,
+        mode: Literal["full", "outline", "code"] = "full",
     ) -> str:
         with _tool_errors():
-            return tools.read_page(catalog, url, offset, max_chars, reference_format=reference_format)
+            return tools.read_page(
+                catalog, url, offset, max_chars, reference_format=reference_format, section=section, mode=mode,
+            )
 
     @server.tool(description=(
         f"""Show the table of contents (1-6 levels via `depth`) of the publication, or of the subtree under the
