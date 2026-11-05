@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from siemens_docs_mcp.content import _clean_html
-from siemens_docs_mcp.converter import html_to_markdown
+from siemens_docs_mcp.converter import html_to_blocks, html_to_markdown
 
 FIX = Path(__file__).parent / "fixtures" / "html"
 
@@ -54,3 +54,31 @@ def test_unknown_inline_only_tag_not_dropped() -> None:
     md = html_to_markdown("<dl><dt>Term</dt><dd>Definition</dd></dl><pre>x = 1\ny = 2</pre>", "T")
     assert "Term" in md and "Definition" in md
     assert "x = 1\ny = 2" in md
+
+
+def test_blocks_kinds_and_levels() -> None:
+    html = (
+        '<div><p class="Blocktitle">Requirement</p><p>Text</p><h3>Deep</h3>'
+        '<table class="table_sourcecode"><tr><td><p class="p_table_l_code">x();</p></td></tr></table>'
+        '<table class="safety"><tr><td>Note</td><td>Careful</td></tr></table>'
+        "<ul><li>a</li></ul><table><tr><td>h</td></tr><tr><td>v</td></tr></table></div>"
+    )
+    assert [(b.kind, b.level) for b in html_to_blocks(html)] == [
+        ("heading", 2), ("paragraph", 0), ("heading", 3), ("code", 0),
+        ("quote", 0), ("list", 0), ("table", 0),
+    ]
+
+
+def test_blocks_open_nested_divs_and_drop_adjacent_duplicates() -> None:
+    blocks = html_to_blocks("<div><div><p>A</p><p>B</p></div><div><p>A</p><p>B</p></div></div>")
+    assert [b.text for b in blocks] == ["A", "B"]
+
+
+def test_blocks_empty_source() -> None:
+    assert html_to_blocks("") == [] and html_to_blocks("  \n") == []
+
+
+def test_html_to_markdown_is_blocks_joined() -> None:
+    html = _clean_html(FIX.joinpath("openness_page.html").read_text("utf-8"))
+    blocks = html_to_blocks(html)
+    assert html_to_markdown(html, "T") == "# T\n\n" + "\n\n".join(b.text for b in blocks) + "\n"

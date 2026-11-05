@@ -19,38 +19,65 @@ from __future__ import annotations
 
 import html as html_module
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Literal
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 from markdownify import markdownify
 
+BlockKind = Literal["heading", "paragraph", "code", "table", "list", "quote", "other"]
+# Maps an anchor href to a replacement href, or to None to keep only the link label.
+LinkRewrite = Callable[[str], str | None]
+
+
+@dataclass(frozen=True)
+class Block:
+    """One top-level piece of a page: finished Markdown plus what reading modes need to know about it."""
+
+    kind: BlockKind
+    text: str
+    level: int = 0  # 1-6 for headings, 0 otherwise
+
+
+@dataclass(frozen=True)
+class _Options:
+    """Rendering choices passed down explicitly (not module state) so concurrent reads cannot mix them."""
+
+    link: LinkRewrite | None = None
+    images: bool = True
+
+
 # ---------------------------------------------------------------------------
-# Public entry point
+# Public entry points
 # ---------------------------------------------------------------------------
 
-def html_to_markdown(html: str, title: str) -> str:
-    """Convert an HTML string to a Markdown document.
-
-    Args:
-        html:  Cleaned HTML content (output of :func:`siemens_docs_mcp.content.fetch_html`).
-        title: Page title — prepended as an H1 heading.
-
-    Returns:
-        Complete Markdown string beginning with an H1 title heading.
-    """
-    if not html.strip():
-        return f"# {title}\n\n*No content available.*\n"
-
-    soup = BeautifulSoup(html, "html.parser")
-    blocks: list[str] = []
-
-    for child in soup.contents:
+def html_to_blocks(
+    source: BeautifulSoup | str, *, link: LinkRewrite | None = None, images: bool = True
+) -> list[Block]:
+    """Convert cleaned HTML (a parsed tree or a string) into Markdown blocks, without the page title."""
+    if isinstance(source, str):
+        if not source.strip():
+            return []
+        source = BeautifulSoup(source, "html.parser")
+    opts = _Options(link, images)
+    blocks: list[Block] = []
+    for child in source.contents:
         if isinstance(child, Tag):
-            rendered = _render_block(child)
-            if rendered:
-                blocks.append(rendered)
+            blocks.extend(_render_block(child, opts))
+    # Post-process per block; joining blocks with one blank line then equals post-processing the whole body.
+    finished = (Block(b.kind, _post_process(b.text), b.level) for b in blocks)
+    return [b for b in finished if b.text]
 
-    body = _post_process("\n\n".join(blocks))
+
+def html_to_markdown(
+    source: BeautifulSoup | str, title: str, *, link: LinkRewrite | None = None, images: bool = True
+) -> str:
+    """Convert cleaned HTML to a Markdown document beginning with an H1 title heading (the exporter's format)."""
+    if not str(source).strip():
+        return f"# {title}\n\n*No content available.*\n"
+    body = "\n\n".join(b.text for b in html_to_blocks(source, link=link, images=images))
     return f"# {title}\n\n{body}\n"
 
 
@@ -82,7 +109,7 @@ def _normalize_code(code: str) -> str:
 # Inline rendering
 # ---------------------------------------------------------------------------
 
-def _inline_to_md(node: Tag | NavigableString) -> str:
+def _inline_to_md(node: Tag | NavigableString, opts: _Options) -> str:
     """Recursively render an inline node to Markdown text."""
     if isinstance(node, NavigableString):
         return str(node)
@@ -93,27 +120,22 @@ def _inline_to_md(node: Tag | NavigableString) -> str:
         return "\n"
     if name == "a":
         href = node.get("href", "")
-        content = "".join(_inline_to_md(c) for c in node.children).strip()
+        content = "".join(_inline_to_md(c, opts) for c in node.children).strip()
         label = _clean_text(content) or href
         return f"[{label}]({href})" if href else label
     if name in {"b", "strong"}:
-        inner = _clean_text("".join(_inline_to_md(c) for c in node.children))
+        inner = _clean_text("".join(_inline_to_md(c, opts) for c in node.children))
         return f"**{inner}**" if inner else ""
     if name in {"i", "em"}:
-        inner = _clean_text("".join(_inline_to_md(c) for c in node.children))
+        inner = _clean_text("".join(_inline_to_md(c, opts) for c in node.children))
         return f"*{inner}*" if inner else ""
     if name == "code":
-        inner = _clean_text("".join(_inline_to_md(c) for c in node.children))
+        inner = _clean_text("".join(_inline_to_md(c, opts) for c in node.children))
         return f"`{inner}`" if inner else ""
     if name == "img":
-        src = node.get("src") or ""
-        alt = node.get("alt") or ""
-        # Skip embedded data URIs (text-only output)
-        if src.startswith("data:image/"):
-            return alt or ""
-        return f"![{alt}]({src})" if src else alt
+        return _render_img(node, opts)
     # Fallthrough: render children
-    return "".join(_inline_to_md(c) for c in node.children)
+    return "".join(_inline_to_md(c, opts) for c in node.children)
 
 
 # ---------------------------------------------------------------------------
@@ -124,36 +146,36 @@ def _inline_to_md(node: Tag | NavigableString) -> str:
 _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 
 
-def _render_block(tag: Tag) -> str:
-    """Render a single block-level HTML tag to Markdown."""
+def _render_block(tag: Tag, opts: _Options) -> list[Block]:
+    """Render one block-level HTML tag; containers yield their children's blocks."""
     name = tag.name.lower()
 
     # --- Headings (h1–h6) ---
     if name in _HEADING_TAGS:
         level = int(name[1])
-        text = _clean_text("".join(_inline_to_md(c) for c in tag.children))
-        return f"{'#' * level} {text}" if text else ""
+        text = _clean_text("".join(_inline_to_md(c, opts) for c in tag.children))
+        return [Block("heading", f"{'#' * level} {text}", level)] if text else []
 
     # --- Paragraphs ---
     if name == "p":
         cls = set(tag.get("class", []))
-        text = _normalize_code("".join(_inline_to_md(c) for c in tag.children))
+        text = _normalize_code("".join(_inline_to_md(c, opts) for c in tag.children))
         if not text:
-            return ""
+            return []
         # Siemens section-title classes → H2
         if "BlocktitleFirst" in cls or "Blocktitle" in cls:
-            return f"## {_clean_text(text)}"
+            return [Block("heading", f"## {_clean_text(text)}", 2)]
         # Siemens inline code paragraph classes → fenced code block
         if "p_table_l_code" in cls or "table_sourcecode" in cls:
-            return f"```\n{text}\n```"
+            return [Block("code", f"```\n{text}\n```")]
         # Table-title paragraphs carry no useful prose — skip
         if "p_table_title" in cls:
-            return ""
-        return _clean_text(text)
+            return []
+        return [Block("paragraph", _clean_text(text))]
 
     # --- Lists ---
     if name in {"ul", "ol"}:
-        return _render_list(tag, level=0)
+        return _block("list", _render_list(tag, 0, opts))
 
     # --- Tables ---
     if name == "table":
@@ -164,47 +186,51 @@ def _render_block(tag: Tag) -> str:
             code_lines = [p.get_text() for p in tag.find_all("p", class_="p_table_l_code")]
             raw = "\n".join(code_lines) if code_lines else tag.get_text("\n", strip=False)
             code = _normalize_code(raw)
-            return f"```\n{code}\n```" if code else ""
+            return [Block("code", f"```\n{code}\n```")] if code else []
         if "safety" in classes:
-            return _render_safety_table(tag)
-        return _render_regular_table(tag)
+            return _block("quote", _render_safety_table(tag))
+        return _block("table", _render_regular_table(tag, opts))
 
     # --- Divs ---
     if name == "div":
         if "admonition" in tag.get("class", []):
-            return _render_admonition(tag)
-        return _render_div(tag)
+            return _block("quote", _render_admonition(tag, opts))
+        return _render_div(tag, opts)
 
     # --- Preformatted code ---
     if name == "pre":
         code = _normalize_code(tag.get_text())
-        return f"```\n{code}\n```" if code else ""
+        return [Block("code", f"```\n{code}\n```")] if code else []
 
     # --- Standalone images ---
     if name == "img":
-        src = tag.get("src") or ""
-        alt = tag.get("alt") or ""
-        if src.startswith("data:image/"):
-            return alt or ""
-        return f"![{alt}]({src})" if src else alt
+        return _block("paragraph", _render_img(tag, opts))
 
     # --- Ignored structural/chrome tags ---
     if name in {"script", "style", "head", "nav", "button", "form"}:
-        return ""
+        return []
 
     # --- Unknown tag: try to render children ---
-    pieces = []
-    for child in tag.children:
-        if isinstance(child, Tag):
-            rendered = _render_block(child)
-            if rendered:
-                pieces.append(rendered)
+    pieces = [b for child in tag.children if isinstance(child, Tag) for b in _render_block(child, opts)]
     if pieces:
-        return "\n\n".join(pieces)
+        return pieces
     # Inline-only unknown tag (dl, details, ...): keep its text via markdownify.
     if tag.get_text(strip=True):
-        return markdownify(str(tag), heading_style="ATX").strip()
-    return ""
+        return _block("other", markdownify(str(tag), heading_style="ATX").strip())
+    return []
+
+
+def _block(kind: BlockKind, text: str) -> list[Block]:
+    return [Block(kind, text)] if text else []
+
+
+def _render_img(tag: Tag, opts: _Options) -> str:
+    src = tag.get("src") or ""
+    alt = tag.get("alt") or ""
+    # Skip embedded data URIs (text-only output)
+    if src.startswith("data:image/"):
+        return alt or ""
+    return f"![{alt}]({src})" if src else alt
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +248,7 @@ def _flush_run(run: list[str], texts: list[str]) -> None:
     run.clear()
 
 
-def _render_list(tag: Tag, level: int) -> str:
+def _render_list(tag: Tag, level: int, opts: _Options) -> str:
     ordered = tag.name.lower() == "ol"
     lines: list[str] = []
     index = 1
@@ -239,18 +265,18 @@ def _render_list(tag: Tag, level: int) -> str:
 
         for child in li.children:
             if isinstance(child, NavigableString) or (isinstance(child, Tag) and child.name.lower() in _INLINE_TAGS):
-                run.append(_inline_to_md(child))
+                run.append(_inline_to_md(child, opts))
                 continue
             if not isinstance(child, Tag):
                 continue
             _flush_run(run, texts)
             child_name = child.name.lower()
             if child_name in {"ul", "ol"}:
-                nested.append(_render_list(child, level + 1))
+                nested.append(_render_list(child, level + 1, opts))
             elif child_name == "table" and "safety" in set(child.get("class", [])):
                 nested.append(_render_safety_table(child))
             else:
-                text = _clean_text("".join(_inline_to_md(c) for c in child.children))
+                text = _clean_text("".join(_inline_to_md(c, opts) for c in child.children))
                 if text:
                     texts.append(text)
         _flush_run(run, texts)
@@ -290,7 +316,7 @@ def _render_safety_table(table: Tag) -> str:
     return "> " + "\n> ".join(lines)
 
 
-def _render_regular_table(table: Tag) -> str:
+def _render_regular_table(table: Tag, opts: _Options) -> str:
     """Render a standard HTML table as a GFM Markdown table."""
     rows: list[list[str]] = []
     for tr in table.find_all("tr"):
@@ -298,7 +324,7 @@ def _render_regular_table(table: Tag) -> str:
         if not cells:
             continue
         row = [
-            _clean_text("".join(_inline_to_md(c) for c in cell.children))
+            _clean_text("".join(_inline_to_md(c, opts) for c in cell.children))
             for cell in cells
         ]
         rows.append(row)
@@ -330,7 +356,7 @@ def _render_regular_table(table: Tag) -> str:
 # Div rendering
 # ---------------------------------------------------------------------------
 
-def _render_admonition(div: Tag) -> str:
+def _render_admonition(div: Tag, opts: _Options) -> str:
     """Render a MkDocs-style admonition div as a labelled Markdown blockquote."""
     title = div.find(class_="admonition-title")
     if title is not None:
@@ -340,10 +366,10 @@ def _render_admonition(div: Tag) -> str:
         label = others[0].capitalize() if others else "Note"
 
     body = [
-        r
+        b.text
         for child in div.children
         if isinstance(child, Tag) and child is not title
-        if (r := _render_block(child))
+        for b in _render_block(child, opts)
     ]
     if not body:
         return f"> **{label}:**"
@@ -353,23 +379,22 @@ def _render_admonition(div: Tag) -> str:
     return "\n".join(out)
 
 
-def _render_div(div: Tag) -> str:
+def _render_div(div: Tag, opts: _Options) -> list[Block]:
     """Render a <div> by visiting its block-level children."""
-    pieces: list[str] = []
+    result: list[Block] = []
+    previous: str | None = None
     for child in div.children:
         if not isinstance(child, Tag):
             continue
-        rendered = _render_block(child)
-        if rendered:
-            pieces.append(rendered)
-
-    # Remove adjacent duplicates (wrapper divs sometimes duplicate content)
-    result: list[str] = []
-    for piece in pieces:
-        if not result or result[-1] != piece:
-            result.append(piece)
-
-    return "\n\n".join(result)
+        blocks = _render_block(child, opts)
+        if not blocks:
+            continue
+        # Remove adjacent duplicates (wrapper divs sometimes duplicate content), compared per child as before.
+        joined = "\n\n".join(b.text for b in blocks)
+        if joined != previous:
+            result.extend(blocks)
+        previous = joined
+    return result
 
 
 # ---------------------------------------------------------------------------
