@@ -2,8 +2,9 @@
 
 Date: 2026-11-01
 Status: sequence and staged delivery approach agreed; milestone 1 design approved
-on 2026-11-02; milestone 2 design approved and implemented on 2026-11-05. Later
-milestones require their own design review.
+on 2026-11-02; milestone 2 design approved and implemented on 2026-11-05; milestone 3
+design and plan approved and implemented on 2026-11-05. Later milestones require their
+own design review.
 Source: [LLM efficiency guidance](../../llm-efficiency-guidance.md).
 
 ## Goal
@@ -98,6 +99,10 @@ a second independent HTML converter.
 
 Exit: headings, repeated headings, nested sections, long code blocks, lists,
 tables, links, and empty pages have defined behavior and content/size tests.
+
+Design: [Structured page reading](../specs/2026-11-05-structured-page-reading-design.md).
+Detailed plan: [Milestone 3 implementation plan](2026-11-05-structured-page-reading.md);
+evidence: [measurements](2026-11-05-structured-page-reading-evidence.md).
 
 ## 4. Batch reading
 

@@ -59,3 +59,27 @@ Offline: all 18 golden cases are identical through both the string path and the 
 | `mode="code", section="Program code"` | 536 |
 
 The fixture's "Program code" sections hold only code, so section and code views coincide here.
+
+## Live "after" measurements (Task 8, 2026-11-05)
+
+Same conditions as the "before" run (`test_reading_measurements`, one catalog/client per host,
+`min_interval=0.3`, cold catalog at each host's first page). `—` = no "Program code" heading (the
+tool returned its no-match or no-headings error, listing the page's sections).
+
+| Page | full compact before → after | full url before → after | outline | section "Program code" | code |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| tia_installing_openness | 1815 → 1815 | 1923 → 1923 | 471 | — | 313 |
+| tia_compiling_a_project | 3988 → 3930 | 4129 → 4129 | 525 | 2365 | 1977 |
+| tia_export_import_sub_modules | 18535 → 17834 | 18669 → 18113 | 750 | — | 10873 |
+| iox_loading_opc_ua_model | 584 → 584 | 705 → 705 | 299 | — | 267 (no-code note) |
+| iox_browse_hierarchy_members | 1455 → 1091 | 1606 → 1242 | 337 | — | 305 |
+
+Observations:
+
+- Compact topic links save 58 and 145 characters on the two TIA pages with topic links; dropping
+  image/attachment URLs saves 556 (TIA sub modules, url mode) and 364 (IIH hierarchy page, both formats).
+- An outline costs 300-750 characters; on the 18k-character sub modules page it is 4% of the full read.
+  Code view on "Compiling a project" is 50% of the full read; `section="Program code"` is 60%.
+- Every compact body link on these pages (6 in total) read back successfully with `read_page`.
+- Paging every page at `max_chars=1000` (up to 21 chunks) produced no chunk with an unbalanced code fence.
+- Page bodies differ only where links or images occur; the headers and text are unchanged.

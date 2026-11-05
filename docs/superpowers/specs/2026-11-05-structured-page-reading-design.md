@@ -1,7 +1,8 @@
 # Structured page reading: milestone 3 design
 
 Date: 2026-11-05
-Status: draft for review.
+Status: approved by the user on 2026-11-05; implemented on branch `claude/wizardly-franklin-86xo5s`
+(see the plan's "Clarifications to the spec made while planning").
 Roadmap: [LLM efficiency roadmap](../plans/2026-11-01-llm-efficiency-roadmap.md), point 3.
 
 ## Intent

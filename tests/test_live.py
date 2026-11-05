@@ -228,10 +228,38 @@ def test_reading_measurements():
         for client in clients.values():
             stack.enter_context(client)
         for page in pages:
-            for reference_format in ("compact", "url"):
-                output = tools.read_page(cat, page["url"], reference_format=reference_format)
+            def measure(mode_label, page=page, **kwargs):
+                try:
+                    output = tools.read_page(cat, page["url"], **kwargs)
+                except ValueError as exc:  # e.g. no "Program code" heading on this page
+                    print("MEASUREMENT " + json.dumps({"label": page["label"], "mode": mode_label, "error": str(exc)[:200]}))
+                    return None
                 assert "> Source:" in output
                 print("MEASUREMENT " + json.dumps({
-                    "label": page["label"], "mode": "full", "format": reference_format, "chars": len(output),
-                    "min_interval": DEFAULT_MIN_INTERVAL,
+                    "label": page["label"], "mode": mode_label, "format": kwargs.get("reference_format", "compact"),
+                    "chars": len(output), "min_interval": DEFAULT_MIN_INTERVAL,
                 }))
+                return output
+
+            full = measure("full", reference_format="compact")
+            measure("full", reference_format="url")
+            measure("outline", mode="outline")
+            measure("section:Program code", section="Program code")
+            measure("code", mode="code")
+
+            # Every compact topic link in a body must read as a page.
+            links = sorted(set(re.findall(r"\]\(((?:tia|iox):[\w~.-]+(?:/[\w~.-]+)?)\)", full.split("\n\n", 1)[1])))
+            for link in links:
+                assert "> Source:" in tools.read_page(cat, link, mode="outline"), link
+            assert "viewer/attachment" not in full and "/api/khub/" not in full
+
+            # Page through with the smallest budget: no chunk may break a code fence.
+            offset, chunks = 0, 0
+            while offset is not None:
+                chunk = tools.read_page(cat, page["url"], offset=offset, max_chars=1000)
+                body = chunk.split("\n\n", 1)[1]
+                assert sum(line.strip() == "```" for line in body.split("\n")) % 2 == 0, (page["label"], offset)
+                match = re.search(r"offset=(\d+)\]$", chunk)
+                offset = int(match.group(1)) if match else None
+                chunks += 1
+            print("PAGED " + json.dumps({"label": page["label"], "links_checked": len(links), "chunks_at_1000": chunks}))
