@@ -2,7 +2,7 @@
 
 The cleaning step removes navigation chrome (breadcrumbs, prev/next links,
 feedback widgets) that Fluidtopics injects around the actual topic content.
-markdownify then handles the HTML → Markdown conversion in a separate step.
+The cleaned tree is handed to the converter as is, so each page is parsed once.
 """
 from __future__ import annotations
 
@@ -32,32 +32,37 @@ _CHROME_SELECTORS = [
 ]
 
 
-def fetch_html(client: FluidtopicsClient, map_id: str, content_id: str) -> str:
-    """Fetch and pre-clean the HTML content for a page.
+def fetch_soup(client: FluidtopicsClient, map_id: str, content_id: str) -> BeautifulSoup | None:
+    """Fetch a page, parse it once and remove navigation chrome in place.
 
-    Args:
-        client: An active :class:`FluidtopicsClient`.
-        map_id: Fluidtopics map identifier.
-        content_id: The ``contentId`` of the topic to fetch.
-
-    Returns:
-        Cleaned HTML string, ready for Markdown conversion.
+    Returns None when the API returns no content, so callers can show their empty-page text.
     """
     raw = client.get_content(map_id, content_id)
     if not raw or not raw.strip():
         log.warning("Empty content returned for %s", content_id)
-        return ""
-    return _clean_html(raw)
+        return None
+    soup = BeautifulSoup(raw, "html.parser")
+    _clean_soup(soup)
+    return soup
 
 
-def _clean_html(html: str) -> str:
-    """Remove navigation chrome from raw HTML."""
-    soup = BeautifulSoup(html, "html.parser")
+def fetch_html(client: FluidtopicsClient, map_id: str, content_id: str) -> str:
+    """Fetch and pre-clean the HTML content for a page, as a string ("" when empty)."""
+    soup = fetch_soup(client, map_id, content_id)
+    return "" if soup is None else str(soup)
 
+
+def _clean_soup(soup: BeautifulSoup) -> None:
+    """Remove navigation chrome from a parsed page, in place."""
     for selector in _CHROME_SELECTORS:
         for el in soup.select(selector):
             # Type guard: BeautifulSoup's select() can return NavigableString
             if isinstance(el, Tag):
                 el.decompose()
 
+
+def _clean_html(html: str) -> str:
+    """Remove navigation chrome from raw HTML."""
+    soup = BeautifulSoup(html, "html.parser")
+    _clean_soup(soup)
     return str(soup)

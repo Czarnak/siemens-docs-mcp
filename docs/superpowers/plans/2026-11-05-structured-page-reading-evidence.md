@@ -29,3 +29,17 @@ identical.
 
 Note: the plan named "Compiling technology object" as a pinned page, but that topic is not in the
 pinned Openness V20 publication. "Compiling a project" (several "Program code" sections) replaces it.
+
+## Parse-once byte identity (Task 3, live, 2026-11-05)
+
+Old path: base-commit `content._clean_html` + `converter.html_to_markdown` (string, parsed twice).
+New path: `content.fetch_soup` + block-based `html_to_markdown` (parsed once). Both fed the same raw
+response per page. Sample: `random.seed(7)`, 120 Openness V20 pages and 40 IIH V2.7 pages (same
+seed and sizes as the design's link sample), `min_interval=0.3`.
+
+| Host | Pages | Identical |
+| --- | ---: | ---: |
+| docs.tia.siemens.cloud | 120 | 120 |
+| docs.industrial-operations-x.siemens.cloud | 40 | 40 |
+
+Offline: all 18 golden cases are identical through both the string path and the soup path.

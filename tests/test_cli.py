@@ -1,9 +1,12 @@
 import logging
+from pathlib import Path
 
 import pytest
 
 from siemens_docs_mcp import cli
 from siemens_docs_mcp.catalog import Catalog
+from siemens_docs_mcp.content import _clean_html
+from siemens_docs_mcp.converter import html_to_markdown
 from tests.conftest import IOX_HOST, TIA_HOST
 
 URL = f"https://{TIA_HOST}/r/en-us/v21/doc"
@@ -64,3 +67,22 @@ def test_resolve_target_url_wins_over_legacy(fake_tia, fake_iox):
     factory, _ = _factory(fake_tia, fake_iox)
     cfg = {"url": URL, "api_base": f"https://{IOX_HOST}", "map_id": "zzz"}
     assert cli._resolve_target(cfg, factory) == (TIA_HOST, "tia2")
+
+
+def test_export_writes_converter_output(fake_tia, monkeypatch, tmp_path):
+    """The exporter's Markdown equals html_to_markdown of the cleaned page (parse-once must not change it)."""
+    raw = (Path(__file__).parent / "fixtures" / "html" / "openness_page.html").read_text("utf-8")
+    fake_tia.contents[("tia2", "tia2-p1")] = raw
+
+    class ContextClient(type(fake_tia)):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    fake_tia.__class__ = ContextClient
+    monkeypatch.setattr(cli, "FluidtopicsClient", lambda host, *a, **k: fake_tia)
+    cli.run({"api_base": f"https://{TIA_HOST}", "map_id": "tia2", "output_dir": str(tmp_path)}, page_filter="page-1")
+    [written] = list(tmp_path.rglob("*.md"))
+    assert written.read_text("utf-8") == html_to_markdown(_clean_html(raw), "Page 1")

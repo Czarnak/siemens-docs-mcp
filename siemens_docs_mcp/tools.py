@@ -15,7 +15,7 @@ from siemens_docs_mcp.catalog import (
     validate_reference_format,
 )
 from siemens_docs_mcp.client import FluidtopicsClient, FluidtopicsError
-from siemens_docs_mcp.content import fetch_html
+from siemens_docs_mcp.content import fetch_soup
 from siemens_docs_mcp.converter import html_to_markdown
 from siemens_docs_mcp.rendering import (
     SearchHit,
@@ -294,8 +294,8 @@ def read_page(
         target = Resolved(res.host, res.map_id, content_id)
         source = catalog.compact_ref(target) if reference_format == "compact" else catalog.id_url(target)
         titles = [info.title]
-    html = fetch_html(catalog.client(res.host), res.map_id, content_id)
-    body = html_to_markdown(html, title)
+    soup = fetch_soup(catalog.client(res.host), res.map_id, content_id)
+    body = html_to_markdown(soup or "", title)
     if offset >= len(body) > 0:
         raise ValueError(f"offset {offset} is past the end of this page (length {len(body)}).")
     end = offset + max_chars

@@ -1,8 +1,12 @@
 """Offline regression checks for HTML to Markdown conversion."""
 from pathlib import Path
 
-from siemens_docs_mcp.content import _clean_html
+import pytest
+from bs4 import BeautifulSoup
+
+from siemens_docs_mcp.content import _clean_html, _clean_soup
 from siemens_docs_mcp.converter import html_to_blocks, html_to_markdown
+from tests.test_converter_golden import GOLDEN
 
 FIX = Path(__file__).parent / "fixtures" / "html"
 
@@ -82,3 +86,11 @@ def test_html_to_markdown_is_blocks_joined() -> None:
     html = _clean_html(FIX.joinpath("openness_page.html").read_text("utf-8"))
     blocks = html_to_blocks(html)
     assert html_to_markdown(html, "T") == "# T\n\n" + "\n\n".join(b.text for b in blocks) + "\n"
+
+
+@pytest.mark.parametrize("case", sorted(GOLDEN))
+def test_soup_path_matches_string_path(case) -> None:
+    entry = GOLDEN[case]
+    soup = BeautifulSoup(entry["html"], "html.parser")
+    _clean_soup(soup)
+    assert html_to_markdown(soup, entry["title"]) == html_to_markdown(_clean_html(entry["html"]), entry["title"])
