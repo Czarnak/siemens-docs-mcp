@@ -217,3 +217,36 @@ def test_final_chunk_and_past_end():
     assert chunk_view([p("short")], 0, 1000) == Chunk("short\n", None)
     with pytest.raises(ValueError, match="length"):
         chunk_view([p("short")], 6, 1000)
+
+
+# --- final review regressions --------------------------------------------------
+
+def test_code_block_with_overlong_first_line_is_readable():
+    code = c("```\n" + "y" * 1500 + "\n```")
+    chunks = _all([code], 1000)
+    assert "".join(ch.text.replace("```", "").replace("\n", "") for ch in chunks) == "y" * 1500
+    for chunk in chunks:
+        assert chunk.text.startswith("```\n") and chunk.text.rstrip("\n").endswith("```")
+
+
+def test_code_block_with_overlong_first_line_after_heading():
+    blocks = [h(2, "Export"), c("```\n" + "z " * 900 + "\n```")]
+    assert _tokens("\n".join(ch.text for ch in _all(blocks, 1000))) == _tokens(view_text(blocks))
+
+
+@pytest.mark.parametrize("size", [998, 999, 1000, 1001, 1002])
+def test_last_block_near_budget_is_readable(size):
+    blocks = [h(1, "Page 1"), p("x" * size)]
+    chunks = _all(blocks, 1000)
+    assert "".join(ch.text for ch in chunks).count("x") == size
+
+
+@pytest.mark.parametrize("line", [990, 991, 992, 993, 994])
+def test_last_code_line_near_budget_is_readable(line):
+    blocks = [c("```\n" + "a" * 50 + "\n" + "b" * line + "\n```")]
+    chunks = _all(blocks, 1000)
+    assert "".join(ch.text for ch in chunks).count("b") == line
+
+
+def test_final_hard_cut_stays_within_budget():
+    assert len(chunk_view([p("x" * 2000)], 1000, 1000).text) <= 1000

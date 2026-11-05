@@ -157,3 +157,8 @@ def test_render_continuation():
         '[truncated — call again with section="Program code", mode="code", offset=5]'
     )
     assert render_continuation(7, 3, "full") == "[truncated — call again with section=3, offset=7]"
+
+
+def test_render_continuation_repeats_url_format():
+    assert render_continuation(9, None, "full", "url") == '[truncated — call again with reference_format="url", offset=9]'
+    assert render_continuation(9, None, "full", "compact") == "[truncated — call again with offset=9]"

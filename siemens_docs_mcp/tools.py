@@ -67,13 +67,17 @@ def _search_reference(catalog: Catalog, host: str, topic: dict, reference_format
     return catalog.fallback_reader_url(topic.get("readerUrl")) or "(reference unavailable)"
 
 
-def _body_link(catalog: Catalog, reference_format: ReferenceFormat) -> LinkRewrite:
-    """Page-body link policy: drop attachment URLs; topic links follow reference_format."""
+def _body_link(catalog: Catalog, reference_format: ReferenceFormat, host: str) -> LinkRewrite:
+    """Page-body link policy: drop attachment URLs; topic links on the page's own host follow reference_format.
+
+    Links to other hosts stay unchanged: whether their publication list is loaded depends on earlier calls,
+    and the same page must always render the same text, or offsets from a previous call would drift.
+    """
     def rewrite(href: str) -> str | None:
         if catalog.is_attachment_link(href):
             return None
         if reference_format == "compact":
-            return catalog.compact_link(href) or href
+            return catalog.compact_link(href, host=host) or href
         return href
 
     return rewrite
@@ -340,7 +344,7 @@ def read_page(
         source = catalog.compact_ref(target) if reference_format == "compact" else catalog.id_url(target)
         titles = [info.title]
     soup = fetch_soup(catalog.client(res.host), res.map_id, content_id)
-    body = html_to_blocks(soup, link=_body_link(catalog, reference_format), images=False) if soup else []
+    body = html_to_blocks(soup, link=_body_link(catalog, reference_format, res.host), images=False) if soup else []
     full = [Block("heading", f"# {title}", 1), *(body or [Block("paragraph", "*No content available.*")])]
     if mode == "outline":
         return render_page(info, titles, source, render_outline(len(view_text(full)), outline_rows(body)))
@@ -353,7 +357,7 @@ def read_page(
     chunk = chunk_view(view, offset, max_chars)
     text = chunk.text
     if chunk.next_offset is not None:
-        text += "\n\n" + render_continuation(chunk.next_offset, section, mode)
+        text += "\n\n" + render_continuation(chunk.next_offset, section, mode, reference_format)
     return render_page(info, titles, source, text)
 
 

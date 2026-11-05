@@ -91,3 +91,13 @@ Observations:
 - Per-block post-processing trims only blank lines; leading spaces are stripped once at the body start, as before.
 
 Live byte-identity re-run after these fixes: 120/120 TIA and 40/40 IIH pages identical to the base converter.
+
+## Final review fixes (after Task 8)
+
+- Chunking dead ends fixed: a code block with an over-long first line, and a last block or last code
+  line at exactly the budget, can now be read; "start the next chunk here" is decided by trying the
+  same line split with a full budget, so it can no longer disagree with the splitter.
+- Continuation lines repeat `reference_format="url"`; only same-host body links are compacted.
+- Reviewer fuzz re-run on the fixed splitter: 300 random block lists, hint traversal with no errors,
+  no over-budget chunk, no content mismatch, no unbalanced fence; 4000 max_chars-switching cases
+  with no loss; all exact-budget edge cases readable.

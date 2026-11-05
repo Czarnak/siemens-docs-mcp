@@ -279,19 +279,23 @@ class Catalog:
             cached = self._maps.get(host)
             return cached[1] if cached and self._fresh(cached[0]) else None
 
-    def compact_link(self, url: str) -> str | None:
+    def compact_link(self, url: str, host: str | None = None) -> str | None:
         """Compact reference for a page-body link to ``/r/<mapId>[/<contentId>]``, or None to leave it alone.
 
         No network: the map id must be in an already-loaded publication list, because a short pretty URL
         (``/r/foo/bar``) looks exactly like an id URL. Links with a query or fragment are left alone so
-        in-page anchors are not lost.
+        in-page anchors are not lost. With ``host``, only links to that host are rewritten.
         """
         parts = _split_body_url(url)
         if parts is None:
             return None
-        host = (parts.hostname or "").lower()
-        if parts.scheme not in ("http", "https") or parts.query or parts.fragment or host not in self.hosts:
+        link_host = (parts.hostname or "").lower()
+        if (
+            parts.scheme not in ("http", "https") or parts.query or parts.fragment or link_host not in self.hosts
+            or (host is not None and link_host != host.lower())
+        ):
             return None
+        host = link_host
         segs = unquote(parts.path).rstrip("/").split("/")[1:]  # ["r", mapId, contentId?]
         maps = self._loaded_maps(host)
         if maps is None or len(segs) not in (2, 3) or segs[0] != "r":

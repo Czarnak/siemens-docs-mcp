@@ -32,6 +32,9 @@
 3. **Resuming inside an oversized block:** go back to the start of the line containing `offset` only if that line fits within `max_chars`; otherwise resume exactly at `offset`. Without this, a long line split at a space would loop back to its start forever.
 4. **A block larger than `max_chars` fills the remaining budget of the current chunk** instead of always starting a new chunk. Without this, a page title followed by one huge paragraph would return an 8-character first chunk.
 5. **`read_page` treats a page that renders zero blocks as empty** (the `*No content available.*` line). The exporter's `html_to_markdown` keeps its exact legacy output for that case.
+6. **Added after the final review:** only links to the page's own host are compacted (whether another
+   host's list is loaded depends on earlier calls, which would make offsets drift between identical
+   calls), and the continuation line also repeats `reference_format="url"`, since offsets depend on it.
 
 ## Review Focus
 

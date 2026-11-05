@@ -112,8 +112,8 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
         reference). mode='outline' lists numbered headings with sizes. `section` takes an outline number or heading
         text (e.g. 'Program code', which also matches 'Program code: …') and returns only matching sections.
         mode='code' returns only code blocks under their headings and combines with `section`. Long results end
-        with the exact arguments to continue (`offset`, plus `section`/`mode` when set).
-        Links to other topics in a page body follow reference_format; images keep only their alt text.
+        with the exact arguments to continue (`offset`, plus `section`/`mode`/`reference_format` when set).
+        Links to other topics on the same host in a page body follow reference_format; images keep only their alt text.
         {_URL_DOC} {_REFERENCE_DOC} {hosts_doc}"""
     ))
     def read_page(

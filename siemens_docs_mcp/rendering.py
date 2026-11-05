@@ -115,12 +115,16 @@ def render_outline(total_chars: int, rows: Sequence[OutlineRow]) -> str:
     return "\n".join(lines)
 
 
-def render_continuation(next_offset: int, section: int | str | None, mode: ReadMode) -> str:
-    """The exact arguments that return the next chunk of the same view."""
+def render_continuation(
+    next_offset: int, section: int | str | None, mode: ReadMode, reference_format: str = "compact"
+) -> str:
+    """The exact arguments that return the next chunk of the same view (offsets depend on all of them)."""
     args = []
     if section is not None:
         args.append(f"section={json.dumps(section, ensure_ascii=False)}")
     if mode != "full":
         args.append(f'mode="{mode}"')
+    if reference_format != "compact":
+        args.append(f'reference_format="{reference_format}"')
     args.append(f"offset={next_offset}")
     return f"[truncated — call again with {', '.join(args)}]"

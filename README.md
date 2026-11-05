@@ -64,7 +64,7 @@ also work for the built-in hosts. Prefixes are case-insensitive; IDs retain case
 Pass a compact reference or any reader URL returned by a tool (or copied from the
 browser) in the unchanged `url` argument: `read_page(url="tia:MyPublication/MyTopic")`
 or `get_toc(url="tia:MyPublication")`. Set `reference_format="url"` on any tool to
-emit full reader URLs. In `read_page` bodies, links to other topics
+emit full reader URLs. In `read_page` bodies, links to other topics on the same host
 (`https://<host>/r/<mapId>/<contentId>`) become compact references too (or stay full
 URLs with `reference_format="url"`); other links are unchanged, and images keep only
 their alt text. Exported Markdown is not affected. The CLI continues to use reader URLs in its configuration;
@@ -82,8 +82,9 @@ To read only part of a long page, ask for its outline first:
 with their sizes. Then pass a number or heading text as `section`:
 `section="Program code"` returns every "Program code" and "Program code: …" section.
 `mode="code"` returns only the code blocks, each under its heading, and combines with
-`section`. Long results are cut between blocks (never inside a code block or table row)
-and end with the exact arguments for the next part.
+`section`. Long results are cut between blocks; a code block or table too large for one
+part is split at a line, with its fence or header repeated. Each part ends with the exact
+arguments for the next one.
 
 Environment variables:
 

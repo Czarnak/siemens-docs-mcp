@@ -516,3 +516,24 @@ def test_read_page_attachment_link_keeps_label(catalog, fake_tia):
     )
     out = read_page(catalog, P1_URL)
     assert "Get the Download GSD file." in out and "viewer/attachment" not in out
+
+
+def test_url_format_hint_keeps_the_same_view(catalog, fake_tia):
+    paras = "".join(f'<p>Para {i:02d} see <a href="https://{TIA_HOST}/r/tia1/t{i}">topic</a>.</p>' for i in range(40))
+    fake_tia.contents[("tia2", "tia2-p1")] = paras
+    first = read_page(catalog, P1_URL, reference_format="url", max_chars=1000)
+    hint = re.search(r"\[truncated — call again with (.*)\]$", first).group(1)
+    assert 'reference_format="url"' in hint
+    offset = int(re.search(r"offset=(\d+)", hint).group(1))
+    second = read_page(catalog, P1_URL, reference_format="url", max_chars=1000, offset=offset)
+    last_first = re.findall(r"Para (\d+)", _body(first))[-1]
+    first_second = re.findall(r"Para (\d+)", _body(second))[0]
+    assert int(first_second) == int(last_first) + 1
+
+
+def test_cross_host_links_do_not_depend_on_cache(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = f'<p>See <a href="https://{IOX_HOST}/r/iox1/iox1-p1">intro</a>.</p>'
+    before = read_page(catalog, P1_URL)
+    catalog.maps(IOX_HOST)
+    assert read_page(catalog, P1_URL) == before
+    assert f"](https://{IOX_HOST}/r/iox1/iox1-p1)" in before
