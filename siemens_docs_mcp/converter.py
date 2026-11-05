@@ -67,8 +67,12 @@ def html_to_blocks(
     for child in source.contents:
         if isinstance(child, Tag):
             blocks.extend(_render_block(child, opts))
-    # Post-process per block; joining blocks with one blank line then equals post-processing the whole body.
-    finished = (Block(b.kind, _post_process(b.text), b.level) for b in blocks)
+    # Post-process per block, trimming only blank lines, then strip the start of the first block: joined
+    # with one blank line, the blocks then equal the old single post-processing pass over the whole body.
+    finished = [b for b in (Block(b.kind, _post_process(b.text), b.level) for b in blocks) if b.text]
+    if finished and finished[0].text != finished[0].text.lstrip():
+        first = finished[0]
+        finished[0] = Block(first.kind, first.text.lstrip(), first.level)
     return [b for b in finished if b.text]
 
 
@@ -432,7 +436,7 @@ def _render_div(div: Tag, opts: _Options) -> list[Block]:
 # ---------------------------------------------------------------------------
 
 def _post_process(md: str) -> str:
-    """Collapse excessive blank lines and strip trailing whitespace."""
+    """Collapse excessive blank lines, strip trailing whitespace and surrounding blank lines."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")
     lines = [line.rstrip() for line in md.splitlines()]
 
@@ -447,4 +451,4 @@ def _post_process(md: str) -> str:
             blank_run = 0
             result.append(line)
 
-    return "\n".join(result).strip()
+    return "\n".join(result).strip("\n")

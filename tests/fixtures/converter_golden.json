@@ -88,5 +88,15 @@
   "html": "   ",
   "title": "T",
   "markdown": "# T\n\n*No content available.*\n"
+ },
+ "snippet_leading_space_alt": {
+  "html": "<p>A</p><img alt=\"   data alt\" src=\"data:image/png;base64,xx\"><p>B</p>",
+  "title": "T",
+  "markdown": "# T\n\nA\n\n   data alt\n\nB\n"
+ },
+ "snippet_leading_space_first": {
+  "html": "<img alt=\"  first\" src=\"data:image/png;base64,xx\"><p>B</p>",
+  "title": "T",
+  "markdown": "# T\n\nfirst\n\nB\n"
  }
 }

@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal
-from urllib.parse import unquote, urlsplit
+from urllib.parse import SplitResult, unquote, urlsplit
 
 from siemens_docs_mcp.client import FluidtopicsClient
 from siemens_docs_mcp.toc import TocPage, iter_pages, parse_toc
@@ -82,6 +82,16 @@ def _map_info(raw: dict) -> MapInfo:
         cluster_id=_first(meta, "ft:clusterId"),
         last_publication=_first(meta, "ft:lastPublication"),
     )
+
+
+def _split_body_url(url: str) -> SplitResult | None:
+    """Parse a page-body href; None for malformed ones (e.g. "http://[IP address of the CPU]/")."""
+    try:
+        parts = urlsplit(url.strip())
+        parts.hostname  # noqa: B018 - may raise for bracketed or invalid hosts
+    except ValueError:
+        return None
+    return parts
 
 
 class Catalog:
@@ -276,7 +286,9 @@ class Catalog:
         (``/r/foo/bar``) looks exactly like an id URL. Links with a query or fragment are left alone so
         in-page anchors are not lost.
         """
-        parts = urlsplit(url.strip())
+        parts = _split_body_url(url)
+        if parts is None:
+            return None
         host = (parts.hostname or "").lower()
         if parts.scheme not in ("http", "https") or parts.query or parts.fragment or host not in self.hosts:
             return None
@@ -291,8 +303,10 @@ class Catalog:
 
     def is_attachment_link(self, url: str) -> bool:
         """True for image/attachment URLs on an allowed host."""
-        parts = urlsplit(url.strip())
-        return (parts.hostname or "").lower() in self.hosts and bool(_ATTACHMENT_PATH.match(parts.path))
+        parts = _split_body_url(url)
+        return parts is not None and (parts.hostname or "").lower() in self.hosts and bool(
+            _ATTACHMENT_PATH.match(parts.path)
+        )
 
     def compact_ref(self, target: Resolved) -> str:
         host = self._check_host(target.host)

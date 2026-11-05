@@ -500,3 +500,19 @@ def test_read_page_section_hint_repeats_arguments(catalog, fake_tia):
     assert match
     nxt = read_page(catalog, P1_URL, section="Program code", mode="code", max_chars=1000, offset=int(match.group(1)))
     assert _body(nxt).startswith("```\nline ")
+
+
+@pytest.mark.parametrize("reference_format", ["compact", "url"])
+@pytest.mark.parametrize("href", ["http://[IP address of the CPU]/", "http://[bad", "https://a]b/r/x"])
+def test_read_page_survives_malformed_body_links(catalog, fake_tia, reference_format, href):
+    fake_tia.contents[("tia2", "tia2-p1")] = f'<p>Open <a href="{href}">the web server</a>.</p>'
+    out = read_page(catalog, P1_URL, reference_format=reference_format)
+    assert f"[the web server]({href})" in out
+
+
+def test_read_page_attachment_link_keeps_label(catalog, fake_tia):
+    fake_tia.contents[("tia2", "tia2-p1")] = (
+        f'<p>Get the <a href="https://{TIA_HOST}/viewer/attachment/tia1/gsd">Download GSD</a> file.</p>'
+    )
+    out = read_page(catalog, P1_URL)
+    assert "Get the Download GSD file." in out and "viewer/attachment" not in out

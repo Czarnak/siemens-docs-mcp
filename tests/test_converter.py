@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-from siemens_docs_mcp.content import _clean_html, _clean_soup
+from siemens_docs_mcp.content import _clean_html, _clean_soup, fetch_soup
 from siemens_docs_mcp.converter import html_to_blocks, html_to_markdown
 from tests.test_converter_golden import GOLDEN
 
@@ -123,3 +123,29 @@ def test_link_hook_reaches_markdownify_fallback() -> None:
         link=lambda h: "tia:m/a", images=False,
     )
     assert "tia:m/a" in md and "(A)" not in md and "p.png" not in md and "pic" in md
+
+
+@pytest.mark.parametrize("html", [
+    (
+        '<table class="safety"><tr><td>Notice</td><td>Switch the <span class="operating-mode">RUN</span>'
+        " CPU off first.</td></tr></table>"
+    ),
+    (
+        '<table class="safety"><tr><td>Note</td><td>Do not stop the PLC <button>?</button> while downloading.'
+        "</td></tr></table>"
+    ),
+    '<table class="table_sourcecode"><tr><td>var x = 1;<button>Copy</button>var y = 2;</td></tr></table>',
+])
+def test_chrome_removed_between_text_nodes_matches_string_path(html) -> None:
+    """Removing chrome leaves adjacent text nodes; they must render as the reparsed string path does."""
+    soup = BeautifulSoup(html, "html.parser")
+    _clean_soup(soup)
+    assert html_to_markdown(soup, "T") == html_to_markdown(_clean_html(html), "T")
+
+
+def test_fetch_soup_merges_text_split_by_removed_chrome() -> None:
+    class Client:
+        def get_content(self, map_id, content_id):
+            return '<table class="safety"><tr><td>Note</td><td>Stop the <button>x</button> PLC.</td></tr></table>'
+
+    assert "> Stop the PLC.\n" in html_to_markdown(fetch_soup(Client(), "m", "c"), "T")

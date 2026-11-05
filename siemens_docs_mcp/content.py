@@ -59,6 +59,9 @@ def _clean_soup(soup: BeautifulSoup) -> None:
             # Type guard: BeautifulSoup's select() can return NavigableString
             if isinstance(el, Tag):
                 el.decompose()
+    # Removal leaves neighbouring text nodes apart; merge them as reparsing the cleaned string would,
+    # so get_text("\n") in the table renderers does not break a sentence in two.
+    soup.smooth()
 
 
 def _clean_html(html: str) -> str:

@@ -83,3 +83,11 @@ Observations:
 - Every compact body link on these pages (6 in total) read back successfully with `read_page`.
 - Paging every page at `max_chars=1000` (up to 21 chunks) produced no chunk with an unbalanced code fence.
 - Page bodies differ only where links or images occur; the headers and text are unchanged.
+
+## Mid-branch adversarial review fixes (after Task 4)
+
+- Malformed body hrefs (e.g. `http://[IP address of the CPU]/`) no longer crash `read_page`; they stay unchanged.
+- Chrome removed between two text nodes no longer splits a line in note/code tables (`soup.smooth()`).
+- Per-block post-processing trims only blank lines; leading spaces are stripped once at the body start, as before.
+
+Live byte-identity re-run after these fixes: 120/120 TIA and 40/40 IIH pages identical to the base converter.
