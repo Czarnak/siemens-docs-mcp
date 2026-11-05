@@ -38,21 +38,22 @@ def render_scoped_search(
     topic_title: str | None,
     total: int,
     hits: Sequence[SearchHit],
-    scan: tuple[int, int] | None = None,
+    scan: tuple[int, int | None] | None = None,
 ) -> str:
     """Hits within one publication or topic subtree.
 
     ``scan`` is ``(checked, publication_total)`` when a subtree scan stopped before checking every
-    publication hit; ``total`` is then only a lower bound and is not shown.
+    publication hit (the total is None when unknown); ``total`` is then only a lower bound and is not shown.
     """
     scope = f"{publication.title} ({publication.version})" if publication.version else publication.title
     if topic_title is not None:
         scope = f'"{topic_title}" — {scope}'
+    checked = "" if scan is None else f"{scan[0]}" + ("" if scan[1] is None else f" of {scan[1]}")
     if not hits:
         if scan is None:
             return f'No results for "{query}" in {scope}.'
         return (
-            f'No results for "{query}" in {scope} among the first {scan[0]} of {scan[1]} publication results. '
+            f'No results for "{query}" in {scope} among the first {checked} publication results. '
             "Try a narrower query or search the whole publication."
         )
     if scan is None:
@@ -60,7 +61,7 @@ def render_scoped_search(
     else:
         header = (
             f'Showing {len(hits)} results for "{query}" in {scope}; '
-            f"checked {scan[0]} of {scan[1]} publication results, more may exist:"
+            f"checked {checked} publication results, more may exist:"
         )
     # The header names the publication, so hits skip the per-hit "— publication (version)" suffix.
     lines = [header]

@@ -292,3 +292,80 @@ def test_subtree_scan_counts_clusters_not_results(catalog, scoped_guide):
     scoped_guide.search_pages = {n: page(n) for n in (1, 2, 3)}
     out = search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha")
     assert "among the first 300 of 800 publication results" in out
+
+
+# --- review follow-ups: unusual upstream paging and hit data ------------------------------------
+
+
+def test_subtree_without_paging_reads_until_an_empty_page(catalog, scoped_guide):
+    """Without totals the scan must not treat page 1 as the whole publication."""
+    scoped_guide.search_pages = {1: {"results": filler(100)}, 2: {"results": sc_hits("sc-a1")}, 3: {"results": []}}
+    out = search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha")
+    assert [c["page"] for c in scoped_guide.search_calls] == [1, 2, 3]
+    assert out.startswith('Found 1 results for "q" in "Chapter A" — Scoped Guide (V21). Showing 1:')
+
+
+def test_subtree_with_null_total_does_not_crash(catalog, scoped_guide):
+    page = make_search_page(sc_hits("sc-a1"), 0, 1, last=True)
+    page["paging"]["totalResultsCount"] = None
+    scoped_guide.search_pages = {1: page}
+    out = search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha")
+    assert out.startswith('Found 1 results for "q" in "Chapter A"')
+
+
+def test_subtree_empty_page_before_the_reported_end_is_partial(catalog, scoped_guide):
+    scoped_guide.search_pages = {
+        1: make_search_page(filler(100), 1000, 1, last=False),
+        2: make_search_page([], 1000, 2, last=False),
+    }
+    assert search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha") == (
+        'No results for "q" in "Chapter A" — Scoped Guide (V21) among the first 100 of 1000 publication results. '
+        "Try a narrower query or search the whole publication."
+    )
+
+
+def test_subtree_cap_with_unknown_total(catalog, scoped_guide):
+    scoped_guide.search_pages = {p: {"results": filler(100)} for p in (1, 2, 3)}
+    assert search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha") == (
+        'No results for "q" in "Chapter A" — Scoped Guide (V21) among the first 300 publication results. '
+        "Try a narrower query or search the whole publication."
+    )
+
+
+def test_subtree_partial_header_with_unknown_total(catalog, scoped_guide):
+    scoped_guide.search_pages = {1: {"results": sc_hits("sc-a1", "sc-a2") + filler(98)}}
+    out = search_docs(catalog, "q", None, None, scope="tia:sc/sc-cha", limit=2)
+    assert out.splitlines()[0] == (
+        'Showing 2 results for "q" in "Chapter A" — Scoped Guide (V21); '
+        "checked 100 publication results, more may exist:"
+    )
+
+
+def test_hit_without_map_id_is_skipped_not_blamed_on_the_filter(catalog, fake_tia):
+    fake_tia.search_response = make_search_response([make_hit(), make_hit(title="NoMap", map_id=None)], total=2)
+    out = search_docs(catalog, "q", None, None, scope="tia:tia2")
+    assert "**Hit**" in out and "NoMap" not in out
+
+
+def test_publication_scope_counts_clusters(catalog, fake_tia):
+    response = make_search_response([make_hit()], total=137)
+    response["paging"]["totalClustersCount"] = 72
+    fake_tia.search_response = response
+    out = search_docs(catalog, "q", None, None, scope="tia:tia2")
+    assert out.startswith('Found 72 results for "q" in STEP 7 Basic (V21).')
+
+
+def test_publication_scope_with_null_total_counts_returned_hits(catalog, fake_tia):
+    response = make_search_response([make_hit(), make_hit()])
+    response["paging"]["totalResultsCount"] = None
+    fake_tia.search_response = response
+    assert search_docs(catalog, "q", None, None, scope="tia:tia2").startswith('Found 2 results for "q"')
+
+
+def test_publication_without_locale_metadata_needs_locale(catalog, fake_tia):
+    fake_tia.maps.append(make_map("nl", "No Locale", locale="", pretty="en-us/v21/no-locale"))
+    with pytest.raises(ValueError, match="no locale metadata"):
+        search_docs(catalog, "q", None, None, scope="tia:nl")
+    fake_tia.search_response = make_search_response([make_hit(map_id="nl", content_id="x")])
+    search_docs(catalog, "q", None, "en-us", scope="tia:nl")
+    assert fake_tia.search_calls[-1]["locale"] == "en-US"

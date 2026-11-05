@@ -85,52 +85,70 @@ def _topic_path(catalog: Catalog, res: Resolved) -> list[TocPage]:
     return path
 
 
+def _scoped_total(paging: dict) -> int | None:
+    """Hit count of a publication-scoped search, or None when the API reports none.
+
+    Each cluster yields one scoped hit, so the cluster count is preferred over the result count.
+    """
+    for key in ("totalClustersCount", "totalResultsCount"):
+        value = paging.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
+
+
 def _scoped_topics(data: dict, target: Resolved) -> list[dict]:
     """One topic per cluster, taken from the scoped publication.
 
-    The API silently ignores filters it does not understand, so a cluster without an entry from the
-    scoped publication means the scope was not applied: fail rather than return out-of-scope hits.
+    The API silently ignores filters it does not understand, so a cluster whose topics name only
+    other publications means the scope was not applied: fail rather than return out-of-scope hits.
+    Topics without a map id cannot be placed in the scope and are skipped.
     """
     topics = []
     for cluster in data.get("results") or []:
         candidates = [e["topic"] for e in cluster.get("entries", []) if e.get("type") == "TOPIC" and e.get("topic")]
-        if not candidates:
-            continue
         topic = next((t for t in candidates if t.get("mapId") == target.map_id), None)
-        if topic is None:
+        if topic is not None:
+            topics.append(topic)
+            continue
+        foreign = next((t["mapId"] for t in candidates if t.get("mapId") is not None), None)
+        if foreign is not None:
             raise FluidtopicsError(
                 None,
                 f"{target.host} did not apply the publication filter (returned a hit from publication "
-                f"{candidates[0].get('mapId')!r}); refusing to return results outside the scope.",
+                f"{foreign!r}); refusing to return results outside the scope.",
             )
-        topics.append(topic)
     return topics
 
 
 def _scan_subtree(
     client: FluidtopicsClient, query: str, locale: str, target: Resolved, node: TocPage, limit: int,
-) -> tuple[list[dict], int, tuple[int, int] | None]:
+) -> tuple[list[dict], int, tuple[int, int | None] | None]:
     """Publication-scoped pages filtered to ``node``'s subtree: (topics, matches, scan).
 
-    ``scan`` is ``(checked, publication_total)`` when the page cap stopped the scan early, else None
-    and ``matches`` is exact.
+    ``scan`` is None when every publication hit was checked, so ``matches`` is exact; otherwise it is
+    ``(checked, publication_total)``, with the total None when the API did not report one.
     """
     inside = {page.content_id for page in iter_pages(node)}
     filters = [{"key": PUBLICATION_FILTER_KEY, "values": [target.map_id]}]
     kept: list[dict] = []
     checked = 0
-    publication_total = 0
+    publication_total: int | None = None
     for page in range(1, MAX_SCOPE_PAGES + 1):
         data = client.search(query, locale, filters, page=page, per_page=SCOPE_PAGE_SIZE)
         results = data.get("results") or []
         paging = data.get("paging") or {}
         checked += len(results)
-        # Each cluster yields one hit, so measure progress in clusters when the API reports them.
-        publication_total = paging.get("totalClustersCount", paging.get("totalResultsCount", checked))
+        publication_total = _scoped_total(paging)
         kept += [t for t in _scoped_topics(data, target) if t.get("contentId") in inside]
-        if not results or paging.get("isLastPage") or checked >= publication_total:
+        # Exact only on evidence: the last-page flag, a reached total, or an empty page with no total.
+        if (
+            paging.get("isLastPage")
+            or (publication_total is not None and checked >= publication_total)
+            or (not results and publication_total is None)
+        ):
             return kept[:limit], len(kept), None
-        if len(kept) >= limit:
+        if not results or len(kept) >= limit:
             break
     return kept[:limit], len(kept), (checked, publication_total)
 
@@ -172,7 +190,8 @@ def _scoped_search(
         filters = [{"key": PUBLICATION_FILTER_KEY, "values": [target.map_id]}]
         data = client.search(query, locale, filters, page=1, per_page=limit)
         topics = _scoped_topics(data, target)
-        total = (data.get("paging") or {}).get("totalResultsCount", len(topics))
+        total = _scoped_total(data.get("paging") or {})
+        total = len(topics) if total is None else total
     else:
         topics, total, scan = _scan_subtree(client, query, locale, target, node, limit)
     hits = [_normalize_hit(t, _search_reference(catalog, target.host, t, reference_format)) for t in topics]

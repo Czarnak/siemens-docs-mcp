@@ -32,7 +32,7 @@ _BACKOFF_MAX = 30.0
 
 
 class FluidtopicsError(Exception):
-    """Request to a Fluidtopics host failed; ``status`` is None for network errors."""
+    """Request to a Fluidtopics host failed; ``status`` is None when no HTTP status applies (network, bad response)."""
 
     def __init__(self, status: int | None, message: str) -> None:
         super().__init__(message)

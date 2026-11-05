@@ -83,7 +83,8 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
         title, publication + version, breadcrumb, excerpt and reference, with the total hit count.
         Pass a result's reference to read_page or get_toc. Set `scope` to a publication or topic reference (same
         forms as `url`) to search only that publication or topic subtree; host and locale then come from the scope
-        and product/version must be omitted. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
+        and product/version must be omitted; the header names the scope once and says when a subtree count is
+        partial. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
     ))
     def search_docs(
         query: str,

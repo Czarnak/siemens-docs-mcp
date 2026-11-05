@@ -170,6 +170,31 @@ Small enough to skip a separate detailed plan document: implement in a few
 test-first commits on this branch (tools + rendering, server + docs, live tests),
 running the full offline suite after each.
 
+## Review outcome (2026-11-05)
+
+An adversarial review found no scope leaks or unscoped regressions. Changes made:
+
+- Totals are read defensively: the cluster count is preferred (one scoped hit per cluster) for both
+  scope kinds, and a missing or null total is "unknown" rather than a crash.
+- A subtree count is exact only on evidence: the last-page flag, a reported total that was reached,
+  or an empty page with no total. An empty page before the reported end is partial. With an unknown
+  total, partial headers say "checked N publication results" without "of Y".
+- A hit without `mapId` is skipped; only a hit naming another publication triggers the
+  ignored-filter error.
+- The server test now uses a de-DE scope, so a wrong locale default would fail it.
+
+Known limitations, deliberately left:
+
+- The ignored-filter guard checks each cluster for a scoped-map entry, as designed. If the filter
+  were ignored *and* every cluster also had a sibling from the scoped map, the hits would still be
+  in scope but the total would be unfiltered. Rejecting any foreign entry would be stricter, but
+  could break scoped search if the API ever groups versions in one cluster; the live test that a
+  scoped count is smaller than the unscoped one guards against an ignored filter instead.
+- When a cluster holds two entries from the scoped map, only the first is checked against the
+  subtree. Not observed live (one entry per cluster under the filter).
+- Pre-existing, not changed here: a content id that occurs twice in a TOC resolves to its first
+  occurrence (`find_path`), and a publication pretty URL shared by two maps resolves to one of them.
+
 ## Open points for the builder
 
 - Exact wording of errors and headers may be tuned, provided the meaning above

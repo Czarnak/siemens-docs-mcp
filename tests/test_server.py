@@ -138,3 +138,15 @@ async def test_search_scope_conflict_is_tool_error(server, fake_tia):
         result = await client.call_tool("search_docs", {"query": "x", "scope": "iox:iox1", "host": "docs.tia.siemens.cloud"})
     assert result.is_error
     assert "host" in result.content[0].text
+
+
+@pytest.mark.anyio
+async def test_search_scope_uses_publication_locale_not_server_default(server, fake_tia):
+    """tia5 is de-DE while the server default is en-US: the scope's locale must win."""
+    from tests.conftest import make_hit, make_search_response
+
+    fake_tia.search_response = make_search_response([make_hit(map_id="tia5", content_id="x")])
+    async with Client(server) as client:
+        result = await client.call_tool("search_docs", {"query": "x", "scope": "tia:tia5"})
+    assert not result.is_error, result.content[0].text
+    assert fake_tia.search_calls[0]["locale"] == "de-DE"
