@@ -81,7 +81,10 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
     @server.tool(description=(
         f"""Full-text search of Siemens documentation. Returns a numbered Markdown list (1-50 hits via `limit`):
         title, publication + version, breadcrumb, excerpt and reference, with the total hit count.
-        Pass a result's reference to read_page or get_toc. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
+        Pass a result's reference to read_page or get_toc. Set `scope` to a publication or topic reference (same
+        forms as `url`) to search only that publication or topic subtree; host and locale then come from the scope
+        and product/version must be omitted; the header names the scope once and says when a subtree count is
+        partial. {_REFERENCE_DOC} {_URL_DOC} {_FILTER_DOC} {hosts_doc}"""
     ))
     def search_docs(
         query: str,
@@ -91,8 +94,14 @@ def build_server(catalog: Catalog, settings: Settings) -> MCPServer:
         locale: str | None = None,
         limit: int = 10,
         reference_format: ReferenceFormat = "compact",
+        scope: str | None = None,
     ) -> str:
         with _tool_errors():
+            if scope:  # host and locale come from the scope unless given explicitly
+                return tools.search_docs(
+                    catalog, query, host or None, locale or None, product, version, limit,
+                    reference_format=reference_format, scope=scope,
+                )
             return tools.search_docs(
                 catalog, query, host or settings.hosts[0], locale or settings.locale, product, version, limit,
                 reference_format=reference_format,

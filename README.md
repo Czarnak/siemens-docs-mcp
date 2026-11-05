@@ -49,7 +49,7 @@ Tools:
 
 | Tool                | Purpose                                                                   |
 |---------------------|---------------------------------------------------------------------------|
-| `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`).      |
+| `search_docs`       | Full-text search (filter by `product`, `version`, `locale`, `host`, or limit to one publication or topic subtree with `scope`). |
 | `read_page`         | Read one page as Markdown; page through long pages with `offset`.         |
 | `get_toc`           | Table of contents of a publication or of the subtree under a topic reference. |
 | `list_publications` | List publications; discover valid `product` / `version` values.           |
@@ -67,6 +67,13 @@ or `get_toc(url="tia:MyPublication")`. Set `reference_format="url"` on any tool 
 emit full reader URLs. Only tool-generated address fields change; page-body links
 remain unchanged. The CLI continues to use reader URLs in its configuration;
 compact references are an MCP tool interface.
+
+To search inside a publication or chapter you already found, pass its reference as
+`scope`: `search_docs(query="GetAttribute", scope="tia:MyPublication")` or
+`scope="tia:MyPublication/MyChapter"`. Host and locale then come from the scope, and
+`product`/`version` must be omitted. Publication scope is filtered by the server, so
+its count is exact. Topic scope keeps only hits inside the topic's subtree; it reads at
+most 300 publication results, and says so when its count may be incomplete.
 
 Environment variables:
 

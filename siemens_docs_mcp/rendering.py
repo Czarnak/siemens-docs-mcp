@@ -32,6 +32,49 @@ def render_search(query: str, host: str, total: int, hits: Sequence[SearchHit]) 
     return "\n".join(lines)
 
 
+def render_scoped_search(
+    query: str,
+    publication: MapInfo,
+    topic_title: str | None,
+    total: int,
+    hits: Sequence[SearchHit],
+    scan: tuple[int, int | None] | None = None,
+) -> str:
+    """Hits within one publication or topic subtree.
+
+    ``scan`` is ``(checked, publication_total)`` when a subtree scan stopped before checking every
+    publication hit (the total is None when unknown); ``total`` is then only a lower bound and is not shown.
+    """
+    scope = f"{publication.title} ({publication.version})" if publication.version else publication.title
+    if topic_title is not None:
+        scope = f'"{topic_title}" — {scope}'
+    checked = "" if scan is None else f"{scan[0]}" + ("" if scan[1] is None else f" of {scan[1]}")
+    if not hits:
+        if scan is None:
+            return f'No results for "{query}" in {scope}.'
+        return (
+            f'No results for "{query}" in {scope} among the first {checked} publication results. '
+            "Try a narrower query or search the whole publication."
+        )
+    if scan is None:
+        header = f'Found {total} results for "{query}" in {scope}. Showing {len(hits)}:'
+    else:
+        header = (
+            f'Showing {len(hits)} results for "{query}" in {scope}; '
+            f"checked {checked} publication results, more may exist:"
+        )
+    # The header names the publication, so hits skip the per-hit "— publication (version)" suffix.
+    lines = [header]
+    for index, hit in enumerate(hits, 1):
+        lines.append(
+            f"{index}. **{hit.title}**\n"
+            f"   {' > '.join(hit.breadcrumb)}\n"
+            f"   {hit.excerpt}\n"
+            f"   {hit.reference}"
+        )
+    return "\n".join(lines)
+
+
 def render_publications(host: str, rows: Sequence[tuple[MapInfo, str]], total: int, limit: int) -> str:
     if not rows:
         return f"No publications match these filters on {host}."

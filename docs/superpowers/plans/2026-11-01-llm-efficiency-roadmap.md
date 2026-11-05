@@ -2,7 +2,8 @@
 
 Date: 2026-11-01
 Status: sequence and staged delivery approach agreed; milestone 1 design approved
-on 2026-11-02. Later milestones require their own design review.
+on 2026-11-02; milestone 2 design approved and implemented on 2026-11-05. Later
+milestones require their own design review.
 Source: [LLM efficiency guidance](../../llm-efficiency-guidance.md).
 
 ## Goal
@@ -74,6 +75,9 @@ Preserve the existing unscoped search behavior when no scope is supplied.
 
 Exit: scope is tested against unrelated publications/topics, and the implementation
 states any upstream limitations rather than silently ignoring scope.
+
+Design: [Scoped search](../specs/2026-11-05-scoped-search-design.md). Delivered without a
+separate detailed plan, by agreement.
 
 ## 3. Structured page reading
 
